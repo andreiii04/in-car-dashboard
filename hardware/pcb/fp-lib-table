@@ -1,0 +1,13 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "accelerometer_gyro") (type "KiCad") (uri "${KIPRJMOD}/../libraries/accelerometer_gyro/accelerometer_gyro.pretty") (options "") (descr "LSM6DSOTR, LGA-14"))
+	(lib (name "battery_holder") (type "KiCad") (uri "${KIPRJMOD}/../libraries/battery_holder/battery_holder.pretty") (options "") (descr "Keystone 3003"))
+	(lib (name "charge_schottky") (type "KiCad") (uri "${KIPRJMOD}/../libraries/charge_schottky/charge_schottky.pretty") (options "") (descr "PMEG10020AELP, SOD-128"))
+	(lib (name "env_sensor") (type "KiCad") (uri "${KIPRJMOD}/../libraries/env_sensor/env_sensor.pretty") (options "") (descr "BME680, LGA-8"))
+	(lib (name "gps_antenna") (type "KiCad") (uri "${KIPRJMOD}/../libraries/gps_antenna/gps_antenna.pretty") (options "") (descr "GPS ANT-1 chip antenna"))
+	(lib (name "ili9341_display") (type "KiCad") (uri "${KIPRJMOD}/../libraries/ili9341_display/ili9341_display.pretty") (options "") (descr "MSP2807 display module headers and holes"))
+	(lib (name "supply_cap") (type "KiCad") (uri "${KIPRJMOD}/../libraries/supply_cap/supply_cap.pretty") (options "") (descr "Vishay 593D tantalum, E case"))
+	(lib (name "supply_schottky") (type "KiCad") (uri "${KIPRJMOD}/../libraries/supply_schottky/supply_schottky.pretty") (options "") (descr "PMEG3050EP, SOD-128"))
+	(lib (name "tvs_diode") (type "KiCad") (uri "${KIPRJMOD}/../libraries/tvs_diode/tvs_diode.pretty") (options "") (descr "SMBJ5.0A, SMB"))
+	(lib (name "usb_c") (type "KiCad") (uri "${KIPRJMOD}/../libraries/usb_c/usb_c.pretty") (options "") (descr "GCT USB4930-00-A"))
+)

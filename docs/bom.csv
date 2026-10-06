@@ -1,0 +1,30 @@
+Reference,Qty,Value,Manufacturer,MPN,Description,Footprint,Notes
+BT1,1,3003,Keystone Electronics,3003,"Coin-cell holder, CR2032 / ML2032, THT",battery_holder:BAT_3003,
+C1,1,220u,Vishay,593D227X9010E2TE3,"Tantalum capacitor 220uF 10V, E case, ESR 100 mOhm",supply_cap:220u_tantalum_cap,5 V input bulk
+"C2,C13",2,4u7,Samsung Electro-Mechanics,CL10A475KQ8NNNC,"MLCC 4.7uF 6.3V X5R 10%, 0603",Capacitor_SMD:C_0603_1608Metric,
+"C3-C7,C10,C14-C17,C19-C22",14,100n,Samsung Electro-Mechanics,CL10B104KO8NNNC,"MLCC 100nF 16V X7R 10%, 0603",Capacitor_SMD:C_0603_1608Metric,
+C8,1,1u,Samsung Electro-Mechanics,CL10A105KP8NNNC,"MLCC 1uF 10V X5R 10%, 0603",Capacitor_SMD:C_0603_1608Metric,
+C9,1,10n,Samsung Electro-Mechanics,CL10B103KB8NNNC,"MLCC 10nF 50V X7R 10%, 0603",Capacitor_SMD:C_0603_1608Metric,
+"C11,C12",2,15p,Samsung Electro-Mechanics,CL10C150JB8NNNC,"MLCC 15pF 50V C0G 5%, 0603",Capacitor_SMD:C_0603_1608Metric,crystal load
+C18,1,10u,Samsung Electro-Mechanics,CL10A106MA8NRNC,"MLCC 10uF 25V X5R 20%, 0603",Capacitor_SMD:C_0603_1608Metric,
+D1,1,PMEG3050EP,Nexperia,PMEG3050EP,"Schottky diode 30V 5A, SOD-128",supply_schottky:SMAF_L3.8-W2.5-LS4.7-RD,reverse-polarity protection
+D3,1,PMEG10020AELP,Nexperia,PMEG10020AELPX,"Schottky diode 100V 2A, SOD-128",charge_schottky:SMAF_L3.8-W2.5-LS4.7-RD,backup-cell charge path
+"J1,J2,J4-J6",5,Conn_01x04,,CH31062V200,"Pin header 2.54 mm, 1x6, straight, THT",Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,cut to 1x4
+J3,1,Conn_01x06,,CH31062V200,"Pin header 2.54 mm, 1x6, straight, THT",Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical,
+J7,1,USB4930-00-A_REVA,GCT,USB4930-00-A,"USB-C 2.0 receptacle, SMT, top mount",usb_c:GCT_USB4930-00-A_REVA,
+J8,1,Conn_01x02,,CH31062V200,"Pin header 2.54 mm, 1x6, straight, THT",Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical,"cut to 1x2; BOOT0 jumper, jumper removed"
+L1,1,39n,,CCFH0603 C 39NJ - A80328017,"Inductor 39nH 5% 600mA, 0603",Inductor_SMD:L_0603_1608Metric,VDDA filter; part number as listed by the supplier
+LCD1,1,MSP2807,,KMRTM28028-SPI,"2.8in 320x240 SPI TFT module, ILI9341, SD slot (lcdwiki MSP2807)",ili9341_display:ILI9341_display,"plugs into female sockets, not soldered"
+R1,1,10k,Yageo,AC0603JR-0710KL,"Resistor 10k 5%, 0603",Resistor_SMD:R_0603_1608Metric,
+"R2,R3",2,4k7,Yageo,RC0603FR-074K7L,"Resistor 4.7k 1%, 0603",Resistor_SMD:R_0603_1608Metric,I2C pull-ups
+"R4,R5,R8",3,5k1,Yageo,RC0603FR-075K1L,"Resistor 5.1k 1%, 0603",Resistor_SMD:R_0603_1608Metric,
+"R6,R7",2,1k,Yageo,RC0603FR-071KL,"Resistor 1k 1%, 0603",Resistor_SMD:R_0603_1608Metric,
+TV1,1,SMBJ5.0A,,SMBJ5.0A,"TVS diode 5V unidirectional 600W, SMB",tvs_diode:SMB_L4.6-W3.6-LS5.3-RD,
+U1,1,MCP1825ST-3302E,Microchip,MCP1825ST-3302E/DB,"LDO 3.3V 500mA, SOT-223",Package_TO_SOT_SMD:SOT-223-3_TabPin2,
+U2,1,LSM6DSOTR,STMicroelectronics,LSM6DSOTR,"6-axis IMU, LGA-14",accelerometer_gyro:LGA-14_L3.0-W2.5-P0.50-TL,on the underside of the board
+U3,1,BME680,Bosch Sensortec,BME680,"Gas, pressure, humidity and temperature sensor, LGA-8",env_sensor:LGA-8_L3.0-W3.0-P0.80-TR,
+U4,1,L76L-M33,Quectel,L76L-M33,GPS + GLONASS module,RF_GPS:Quectel_L76,
+U6,1,GPS ANT-1 Chip,,GPS ANT-1 Chip,GPS chip antenna 1575.42 MHz,gps_antenna:GPS_ANT-1_Chip_SMD,"lifted ~1 cm above its pads, see README"
+U7,1,STM32F446RCTx,STMicroelectronics,STM32F446RCT6,"MCU Cortex-M4F 180 MHz, 256 KB flash, LQFP-64",Package_QFP:LQFP-64_10x10mm_P0.5mm,
+X1,1,12MHz,SJK,SJK-7U-12.000-18-30-80-C-30,"Crystal 12 MHz 18pF, 3.2x2.5 mm",Crystal:Crystal_SMD_Abracon_ABM8AIG-4Pin_3.2x2.5mm,
+LCD1 sockets,2,,,,"Female socket 2.54 mm, 1x14 and 1x4, THT",,holds the display module; not in the schematic

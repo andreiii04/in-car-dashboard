@@ -1,0 +1,11 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "accelerometer_gyro") (type "KiCad") (uri "${KIPRJMOD}/../libraries/accelerometer_gyro/accelerometer_gyro.kicad_sym") (options "") (descr "LSM6DSOTR 6-axis IMU"))
+	(lib (name "battery_holder") (type "KiCad") (uri "${KIPRJMOD}/../libraries/battery_holder/battery_holder.kicad_sym") (options "") (descr "Keystone 3003 coin-cell holder"))
+	(lib (name "gps_antenna") (type "KiCad") (uri "${KIPRJMOD}/../libraries/gps_antenna/gps_antenna.kicad_sym") (options "") (descr "GPS ANT-1 chip antenna"))
+	(lib (name "gps_module") (type "KiCad") (uri "${KIPRJMOD}/../libraries/gps_module/gps_module.kicad_sym") (options "") (descr "Quectel L76L-M33 GNSS module"))
+	(lib (name "ili9341_display") (type "KiCad") (uri "${KIPRJMOD}/../libraries/ili9341_display/ili9341_display.kicad_sym") (options "") (descr "MSP2807 2.8in ILI9341 display module"))
+	(lib (name "osc_crystal") (type "KiCad") (uri "${KIPRJMOD}/../libraries/osc_crystal/osc_crystal.kicad_sym") (options "") (descr "SJK 7U 12 MHz crystal"))
+	(lib (name "tvs_diode") (type "KiCad") (uri "${KIPRJMOD}/../libraries/tvs_diode/tvs_diode.kicad_sym") (options "") (descr "SMBJ5.0A TVS diode"))
+	(lib (name "usb_c") (type "KiCad") (uri "${KIPRJMOD}/../libraries/usb_c/usb_c.kicad_sym") (options "") (descr "GCT USB4930-00-A USB-C receptacle"))
+)

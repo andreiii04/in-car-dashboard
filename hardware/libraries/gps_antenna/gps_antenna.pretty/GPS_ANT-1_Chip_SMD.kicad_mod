@@ -1,0 +1,177 @@
+(footprint "GPS_ANT-1_Chip_SMD"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -4 0)
+		(layer "F.SilkS")
+		(uuid "c72c71c8-1594-48eb-804e-7f7111c79456")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "GPS_ANT-1_Chip_SMD"
+		(at 0 4 0)
+		(layer "F.Fab")
+		(uuid "d33de040-1879-4e8f-a301-2ffd750ccc07")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "358d59cd-d26f-4cc0-893b-caacb2410dac")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "fd866523-046e-42d2-b7c4-61558375742c")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -4.02 -2)
+		(end 4.02 -2)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "10ae3a1d-0cdc-4acf-b98c-5bbff96376de")
+	)
+	(fp_line
+		(start -4.02 2)
+		(end 4 2)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "369c93d4-f7cf-4692-ac8d-0282a6418a47")
+	)
+	(fp_line
+		(start 2.3 -1.6)
+		(end 2.3 -0.9)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "18022d0d-0995-4e58-a386-070f1a7fe213")
+	)
+	(fp_line
+		(start 2.3 -1.6)
+		(end 3.7 -1.6)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "a2cea5aa-0f58-4fbc-af50-8b43bbeadd73")
+	)
+	(fp_line
+		(start 2.3 -0.9)
+		(end 3.7 -0.9)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "e257fd2a-08f9-4356-9717-fe68439a65be")
+	)
+	(fp_line
+		(start -5 -2)
+		(end 5 -2)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "1e52265f-b499-4110-89c8-f17c5dc1247b")
+	)
+	(fp_line
+		(start -5 2)
+		(end -5 -2)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "6700dd69-254c-46fa-8d77-f969d9355800")
+	)
+	(fp_line
+		(start 5 -2)
+		(end 5 2)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "84a9bbf0-b66a-4fd4-9e1f-99ada72a2cbc")
+	)
+	(fp_line
+		(start 5 2)
+		(end -5 2)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "054dec2b-854c-47e5-b105-2977a086e915")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(uuid "c1df58bd-7c59-467d-b062-520dfdbe50b3")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" smd rect
+		(at 3.25 0.8)
+		(size 2 1.2)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "0fd2ec70-6a75-4bcb-b051-70876846b37b")
+	)
+	(pad "2" smd rect
+		(at -3 0.8)
+		(size 2 1.2)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "8803e5a6-65be-4b78-9b77-873e8d9804f3")
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/../libraries/gps_antenna/gps_antenna.3dshapes/ANT-SMD_L10.3-W3.0-H1.6.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 0.971 1.33 1.875)
+		)
+		(rotate
+			(xyz -0 -0 -0)
+		)
+	)
+)

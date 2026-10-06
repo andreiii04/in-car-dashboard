@@ -1,0 +1,43 @@
+# local working files
+CLAUDE.md
+.claude/
+
+# datasheets - kept on disk, the README lists the parts
+datasheets/
+
+# docs - the case note, the car numbers, my notes, the pictures and the BOM are public
+docs/*
+!docs/dash_case.md
+!docs/vehicle_info.md
+!docs/notes.md
+!docs/3Dtop.jpeg
+!docs/3Dside.jpeg
+!docs/3Dbottom.jpeg
+!docs/pcb.jpeg
+!docs/stm32_main_page.jpeg
+!docs/sensors.jpeg
+!docs/display.jpeg
+!docs/bom.csv
+
+# 3D models of the custom parts - third-party files, kept on disk, not published
+hardware/libraries/*/*.3dshapes/
+
+# hardware outputs - kept on disk, not published
+hardware/pcb/fab/
+hardware/case/*.stl
+hardware/case/*.3mf
+
+# kicad local and temporary files
+*-backups/
+*.kicad_prl
+_autosave-*
+fp-info-cache
+*.lck
+~*.lck
+.history/
+
+# freecad backups
+*.FCBak
+
+# macOS
+.DS_Store

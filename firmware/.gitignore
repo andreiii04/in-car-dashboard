@@ -1,0 +1,17 @@
+# Build artifacts
+build/
+cmake-build-*/
+
+# CLion
+.idea/
+
+# CubeMX intermediate
+.mxproject
+*.launch
+
+# macOS
+.DS_Store
+
+# compiler stack-usage output and flash images
+*.su
+firmware.bin
