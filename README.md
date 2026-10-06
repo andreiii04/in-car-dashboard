@@ -40,12 +40,19 @@ Protection on the 5 V input: a series Schottky against reverse polarity, a TVS d
 - **PCB:** 4-layer FR4, 1.6 mm, ENIG (two LGA sensors), 61.6 × 95.79 mm. Solid ground on In1, 3.3 V pour on In2. Made at JLCPCB.
 - **Schematic:** three sheets, pictured below, or open the KiCad project.
 - **Parts list:** [`docs/bom.csv`](docs/bom.csv), with manufacturer part numbers.
-- **Case:** a 3D-printed bottom tray, [`hardware/case/bottom_tray.FCStd`](hardware/case/bottom_tray.FCStd) (FreeCAD 1.1), described in [`docs/dash_case.md`](docs/dash_case.md). The top case with the display bezel and SD slot is not designed yet.
 
 <p>
   <img src="docs/3Dside.jpeg" width="49%" alt="Board, side view">
-  <img src="docs/3Dbottom.jpeg" width="49%" alt="Board, bottom view">
+  <img src="docs/3Dbottom.jpeg" width="49%" alt="Board, bottom view, with the IMU on the underside">
 </p>
+
+**Display mounting.** The display module is not soldered to the board and does not appear in the renders: female 2.54 mm sockets are soldered into all 18 LCD1 positions (the 14-pin display and touch row and the 4-pin SD row), and male headers on the module's own PCB plug into them, so the screen stacks face-up on top of the main board and can be lifted off. The board's four M3 holes match the module's 44 × 76.08 mm hole pattern, for standoffs between the two.
+
+### Case
+
+A 3D-printed bottom tray holds the board by its walls, with the USB-C opening on one side, intake vents at the BME680 end and exhaust vents at the far end. Source: [`hardware/case/bottom_tray.FCStd`](hardware/case/bottom_tray.FCStd) (FreeCAD 1.1), described in [`docs/dash_case.md`](docs/dash_case.md). The top case with the display bezel and SD slot is not designed yet.
+
+![Board in the bottom tray](docs/case_pcb_side.jpeg)
 
 ### Schematic and layout
 
@@ -55,9 +62,7 @@ Protection on the 5 V input: a series Schottky against reverse polarity, a TVS d
 
 ![Schematic sheet 3: display and SD card module](docs/display.jpeg)
 
-<p align="center">
-  <img src="docs/pcb.jpeg" width="50%" alt="PCB layout with board dimensions, 61.6 x 95.79 mm">
-</p>
+![PCB layout, top view](docs/pcb.jpeg)
 
 ### Known issues on this revision
 
