@@ -138,6 +138,11 @@ static void imu_tick(uint32_t dt_ms) {
     float dt_s = (float)dt_ms / 1000.0f;
     attitude_update(accel[0], accel[1], accel[2], gyro[0], gyro[1], gyro[2], dt_s);
     attitude_get(&att);
+
+    // trip gets the sample after the mount rotation and the gyro bias, the
+    // same numbers the filter just used. handing it the board's own axes left
+    // 0.69 g of gravity on the forward axis at the 43.4 deg dash mount
+    attitude_get_car_axes(accel, gyro);
     trip_update_motion(accel, gyro, att.pitch_deg, att.roll_deg, dt_s);
 
     // tell the filter how hard the car is pushing, every sample - trip works

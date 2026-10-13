@@ -28,7 +28,7 @@ The record is rewritten in place every 10 s, because the car cuts power without 
 | STMicroelectronics STM32F446RCT6 | Cortex-M4F MCU, 180 MHz, 256 KB flash, 128 KB RAM | — |
 | STMicroelectronics LSM6DSOTR | 6-axis accelerometer + gyroscope | I2C1, data-ready on INT1 |
 | Bosch Sensortec BME680 | Temperature, pressure, humidity, gas | I2C1 |
-| Quectel L76L-M33 | GPS + GLONASS receiver, 1 Hz NMEA | USART1, 9600 baud |
+| Quectel L76L-M33 | GPS + GLONASS receiver, 5 Hz NMEA (1 Hz fallback) | USART1, 115200 baud (boots at 9600) |
 | GPS ANT-1 chip antenna | Passive GNSS antenna | RF_IN |
 | KMRTM28028-SPI / MSP2807 | 2.8" 320×240 TFT, ILI9341 driver, full-size SD socket | SPI1 (display), SPI2 (SD) |
 | Microchip MCP1825ST-3302E | 3.3 V LDO | — |
@@ -83,13 +83,13 @@ The loop is paced by the IMU's own data-ready interrupt at about 105 Hz. Each sa
 | Stack | Modules |
 |---|---|
 | Sensors | `i2c_bus` → vendor drivers (ST `lsm6dso`, Bosch `BME68x`) → platform glue → `imu`, `env` |
-| GPS | `uart_bus` (interrupt-driven ring buffer) → `nmea` (parser) → `gps` |
+| GPS | `uart_bus` (interrupt-driven ring buffer, baud switched at runtime) → `nmea` (parser and PMTK command builder) → `gps` |
 | Fusion and statistics | `attitude` (complementary filter, full Euler kinematics, mount rotation), `trip` (distance, peaks, lean, rollover margins, GPS-dropout coasting), `elevation` (GPS altitude fused with barometric pressure) |
 | Display | `lcd` (ILI9341 over SPI) → `gfx` (band renderer, dirty rectangles) → `screen` |
 | Storage | `sd_spi` (SD SPI mode, CRC on every command and block) → FatFs → `session_record` → `session_log` |
 | Console | `usb_serial` (printf over USB CDC) → `console` |
 
-Everything with no hardware in it is host-testable and tested on a PC, 243 checks across seven modules: `nmea`, `attitude`, `trip`, `elevation`, `gfx`, `sd_crc`, `session_record`. Expected values come from independent derivations rather than restatements of the code under test. Car- and mount-specific constants (axis map, calibration, wheelbase, track, centre-of-gravity height) live in one header, `firmware/App/Inc/vehicle_axes.h`, explained in [`docs/vehicle_info.md`](docs/vehicle_info.md).
+Everything with no hardware in it is host-testable and tested on a PC, 257 checks across seven modules: `nmea`, `attitude`, `trip`, `elevation`, `gfx`, `sd_crc`, `session_record`. Expected values come from independent derivations rather than restatements of the code under test. Car- and mount-specific constants (axis map, calibration, wheelbase, track, centre-of-gravity height) live in one header, `firmware/App/Inc/vehicle_axes.h`, explained in [`docs/vehicle_info.md`](docs/vehicle_info.md).
 
 Some decisions worth knowing before changing anything:
 - **Pitch and roll come from accelerometer and gyroscope fused.** The car's own acceleration is subtracted first, using GPS speed and speed × yaw rate, so braking and cornering don't read as tilt.

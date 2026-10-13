@@ -3,8 +3,10 @@
 //
 // - pulls bytes from uart_bus, builds them into whole sentences, hands them to
 //   the NMEA parser and keeps the newest fix
-// - the module talks on its own so nothing here asks it for anything; gps_poll
-//   just picks up whatever has arrived
+// - the module talks on its own; the only thing ever sent to it is three
+//   commands at boot - faster baud, fewer sentences, 5 fixes a second - and
+//   if it does not answer at the new baud this falls back to 9600 and 1 Hz,
+//   which is what it does on its own
 //
 
 #ifndef GPS_H
@@ -18,6 +20,13 @@ typedef enum {
     GPS_ERR_ARG,
     GPS_ERR_UART,
 } gps_status_t;
+
+// how the link to the module stands
+typedef enum {
+    GPS_LINK_SLOW = 0,   // 9600 baud, 1 Hz - what the module boots with, and the fallback
+    GPS_LINK_TRYING,     // switched to 115200, waiting for good sentences to prove it
+    GPS_LINK_FAST,       // 115200 baud, 5 Hz
+} gps_link_t;
 
 typedef struct {
     bool fix_valid;       // there is a usable position
@@ -46,6 +55,12 @@ typedef struct {
     uint32_t other;       // good checksum, a type not handled - GSV, GSA, VTG, GLL
     uint32_t bad;         // failed the checksum - noise on the line
 
+    // the boot commands; the baud one never gets an answer (spec p34), the
+    // sentence set and the fix rate should get one each
+    uint32_t acks_ok;       // PMTK001 with flag 3, done
+    uint32_t acks_failed;   // PMTK001 with any other flag
+    uint32_t switch_tries;  // times the switch to 115200 was tried
+
     // a position fix whose date failed the year check - session 5 had a fix
     // for minutes and never a clock, and nothing kept what the module sent
     uint32_t fix_no_date;           // RMCs like that
@@ -53,12 +68,18 @@ typedef struct {
     uint8_t  rejected_day, rejected_month, rejected_year;  // the last one, as sent
 } gps_stats_t;
 
-// clear the state and start the UART; call after MX_USART1_UART_Init
+// clear the state, start the UART and ask the module for 115200 baud and
+// 5 Hz; blocks ~230 ms while the commands go out. call after
+// MX_USART1_UART_Init
 gps_status_t gps_init(void);
 
-// take whatever bytes have arrived and parse any complete sentences;
-// does not block, call it regularly
+// take whatever bytes have arrived and parse any complete sentences; does not
+// block, call it regularly. the one exception: if the new baud is not proven
+// within 3 s of boot it falls back and tries once more, another ~230 ms
 void gps_poll(void);
+
+// where the switch to the faster link stands
+gps_link_t gps_link(void);
 
 // copy out the newest fix
 gps_status_t gps_get_fix(gps_fix_t *out);

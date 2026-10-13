@@ -65,18 +65,16 @@ static inline void vehicle_map(const float sensor[3], float out[3]) {
 // it measures the mount's tilt, and attitude_set_mount turns it into the
 // rotation that cancels that tilt.
 //
-// FLAT SET - keep these, paste them back to make the tray-on-a-table read
-// flat again after the car calibration has replaced them:
-//   board in the printed bottom tray (no screws, USB-C in), tray on the same
+// FLAT SET - in use. board in the printed bottom tray (no screws, USB-C in), tray on the same
 //   wooden table as step 2, ~17-19 min warm, 3 runs of 500 samples averaged
 //   (agreed to 0.0001 g), 3 Oct 2026; raw tilt pitch +0.84, roll -0.65 deg
-//     #define VEHICLE_REST_ACCEL_X  +0.01448f
-//     #define VEHICLE_REST_ACCEL_Y  -0.01117f
-//     #define VEHICLE_REST_ACCEL_Z  +0.99091f
+#define VEHICLE_REST_ACCEL_X  (+0.01448f)
+#define VEHICLE_REST_ACCEL_Y  (-0.01117f)
+#define VEHICLE_REST_ACCEL_Z  (+0.99091f)
 // the step 2 set (-0.00002, 0.00530, 0.98941) was the bare board resting on
 // its solder tails, not parallel to the table - it read +0.9 / -1.3 in the tray
 //
-// CAR SET - in use. board on the dash, front edge forward, 4 Oct 2026. parked
+// CAR SET - board on the dash, front edge forward, 4 Oct 2026. parked
 // on a slight slope, so measured both ways round on the same spot and the two
 // directions averaged - the slope flips sign, the mount does not:
 //   front up the slope    +0.71401 +0.02540 +0.69531   pitch 45.74 roll 2.09
@@ -84,9 +82,9 @@ static inline void vehicle_map(const float sensor[3], float out[3]) {
 //   2 + 3 runs of 500, agreed to 0.0004 g; slope came out 2.4 deg pitch, 0.4
 //   roll. mount: 43.4 deg nose up, 2.5 deg roll. the axis map above does not
 //   change with that tilt; only these three numbers do
-#define VEHICLE_REST_ACCEL_X   0.68318f
-#define VEHICLE_REST_ACCEL_Y   0.03163f
-#define VEHICLE_REST_ACCEL_Z   0.72270f
+// #define VEHICLE_REST_ACCEL_X   0.68318f
+// #define VEHICLE_REST_ACCEL_Y   0.03163f
+// #define VEHICLE_REST_ACCEL_Z   0.72270f
 
 // what the gyroscope reads while standing perfectly still, in deg/s, again
 // after vehicle_map. this one does not care how the board sits, so the bench

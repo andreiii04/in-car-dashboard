@@ -32,6 +32,9 @@
 #define SCR_COL_W       76
 #define SCR_LCOL_X      58     // left values end here - the ring's side numbers
                                // start at 68 and one row is level with them
+#define SCR_SPEED_X     70     // the speed ends further right: "100" is 3 x 22 px
+                               // in the large font, so it starts at x 4; the ring
+                               // comes no closer than x 86 in that row
 #define SCR_ROW_Y0      36     // right column, four rows
 #define SCR_ROW_H       43
 #define SCR_LROW_Y0     40     // left column, three rows, so they get more room
@@ -163,8 +166,8 @@ static void screen_layout(void) {
              GFX_ALIGN_CENTER, 72, SCR_NUMBER);
 
     // left column: speed is the headline number, so it gets the large font
-    el_setup(EL_L0, &font_large, SCR_LCOL_X,
-             (int16_t)(SCR_LROW_Y0 + SCR_LVALUE_DY), GFX_ALIGN_RIGHT, SCR_LCOL_X - 4, SCR_VALUE);
+    el_setup(EL_L0, &font_large, SCR_SPEED_X,
+             (int16_t)(SCR_LROW_Y0 + SCR_LVALUE_DY), GFX_ALIGN_RIGHT, SCR_SPEED_X - 4, SCR_VALUE);
     for (int i = 1; i < 3; i++) {
         int16_t y = (int16_t)(SCR_LROW_Y0 + i * SCR_LROW_H + SCR_VALUE_DY);
         el_setup((screen_el_id_t)(EL_L0 + i), &font_medium, SCR_LCOL_X, y,

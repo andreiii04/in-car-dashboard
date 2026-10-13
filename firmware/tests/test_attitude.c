@@ -51,6 +51,25 @@ static void gravity_at(float pitch, float roll, float out[3]) {
     out[2] = cosf(pitch * DEG) * cosf(roll * DEG);
 }
 
+// a car-axis vector as a board mounted nose up by `pitch` and rolled by `roll`
+// sees it - two plain turns written out, pitch first, then roll. nothing
+// shared with the Rodrigues maths in attitude.c; car up comes out as
+// gravity_at(pitch, roll), which is what the rest vector in vehicle_axes.h is
+static void car_to_board(const float car[3], float pitch, float roll, float out[3]) {
+    float cp = cosf(pitch * DEG);
+    float sp = sinf(pitch * DEG);
+    float cr = cosf(roll * DEG);
+    float sr = sinf(roll * DEG);
+
+    float x = (cp * car[0]) + (sp * car[2]);
+    float y = car[1];
+    float z = (-sp * car[0]) + (cp * car[2]);
+
+    out[0] = x;
+    out[1] = (cr * y) + (sr * z);
+    out[2] = (-sr * y) + (cr * z);
+}
+
 int main(void) {
     attitude_t a;
     float g[3];
@@ -276,6 +295,54 @@ int main(void) {
     feed(0.0f, 0.4f, 1.0f, 0, 0, 0, 104);
     attitude_get(&a);
     check("told at once, the road stays flat", near(a.roll_deg, 0.0f, 0.01f));
+
+    // sessions 22-23: the board on the dash 43.4 deg nose up, 2.5 deg of roll.
+    // trip was handed the board's own axes, so a parked car read
+    // sin(43.4) = 0.69 g forward and braking never went below zero. the copy
+    // trip gets now has to read in car axes. gravity cannot see a turn about
+    // the vertical, so the mount maths and the two plain turns above disagree
+    // by about a degree of yaw - worth ~0.005 g on 0.3 g, hence the tolerances
+    printf("the car-axis copy trip gets, dash mount 43.4 / 2.5\n");
+    {
+        const float up[3] = { 0.0f, 0.0f, 1.0f };
+        const float braking[3] = { -0.3f, 0.0f, 1.0f };
+        const float yaw[3] = { 0.0f, 0.0f, 10.0f };
+        const float roll_rate[3] = { 10.0f, 0.0f, 0.0f };
+        const float bias[3] = { 0.446f, -0.507f, 0.180f };   // the bench bias
+        float board[3];
+        float car_a[3];
+        float car_g[3];
+
+        attitude_init();
+        car_to_board(up, 43.4f, 2.5f, board);
+        attitude_set_mount(board[0], board[1], board[2]);
+        attitude_set_gyro_bias(bias[0], bias[1], bias[2]);
+        feed(board[0], board[1], board[2], bias[0], bias[1], bias[2], 300);
+        attitude_get_car_axes(car_a, car_g);
+        check("parked: 0 forward, 0 sideways, 1 g up",
+              near(car_a[0], 0.0f, 0.002f) && near(car_a[1], 0.0f, 0.002f) &&
+              near(car_a[2], 1.0f, 0.002f));
+
+        car_to_board(braking, 43.4f, 2.5f, board);
+        feed(board[0], board[1], board[2], bias[0], bias[1], bias[2], 1);
+        attitude_get_car_axes(car_a, car_g);
+        check("0.3 g braking reads -0.3 forward",
+              near(car_a[0], -0.3f, 0.01f) && near(car_a[1], 0.0f, 0.01f));
+
+        // the gyro goes through the same turn, bias off first
+        car_to_board(yaw, 43.4f, 2.5f, board);
+        feed(0.0f, 0.0f, 2.0f, board[0] + bias[0], board[1] + bias[1],
+             board[2] + bias[2], 1);
+        attitude_get_car_axes(car_a, car_g);
+        check("10 dps of car yaw reads 10, not 7.3", near(car_g[2], 10.0f, 0.05f));
+
+        car_to_board(roll_rate, 43.4f, 2.5f, board);
+        feed(0.0f, 0.0f, 2.0f, board[0] + bias[0], board[1] + bias[1],
+             board[2] + bias[2], 1);
+        attitude_get_car_axes(car_a, car_g);
+        check("a roll rate stays out of yaw", near(car_g[2], 0.0f, 0.2f) &&
+                                              near(car_g[0], 10.0f, 0.05f));
+    }
 
     printf("\n%s\n", fails ? "SOME CHECKS FAILED" : "all checks passed");
     return fails != 0;

@@ -53,6 +53,14 @@
 #define TRIP_RESTART_G 0.05f
 #define TRIP_RESTART_S 0.5f
 
+// the forward push from the GPS is the speed change over about this long, not
+// fix to fix - at 5 Hz one fix to the next is 0.2 s, and dividing the speed
+// noise by 0.2 s makes five times the g of dividing it by 1 s
+#define TRIP_ACCEL_SPAN_S 1.0f
+
+// fixes kept for that; 5 Hz needs 6 to look back a whole second, 8 leaves room
+#define TRIP_ACCEL_RING 8
+
 #define TRIP_G_TO_MPS2 9.80665f
 #define TRIP_DEG_TO_RAD 0.017453293f
 #define TRIP_TWO_PI 6.283185307f
@@ -69,7 +77,6 @@ static uint32_t dist_whole_m;
 static float    dist_frac_m;
 
 static float speed_mps;           // best guess right now
-static float gps_speed_mps;       // last one the GPS actually gave
 static bool  have_gps_speed;
 static float since_fix_s;
 
@@ -83,6 +90,12 @@ static float accel_lat_filt_g;
 
 static float long_accel_est_g;    // from the GPS speed changing
 static float lat_accel_est_g;     // from speed and how fast it is turning
+
+// the last few GPS speeds, each with the time since the one before it
+static float    ring_speed_mps[TRIP_ACCEL_RING];
+static float    ring_gap_s[TRIP_ACCEL_RING];
+static uint32_t ring_head;        // where the next one goes
+static uint32_t ring_count;
 
 static uint32_t temp_n, press_n, hum_n;
 
@@ -111,7 +124,6 @@ void trip_init(void) {
     dist_whole_m = 0;
     dist_frac_m = 0.0f;
     speed_mps = 0.0f;
-    gps_speed_mps = 0.0f;
     have_gps_speed = false;
     since_fix_s = 0.0f;
     coasting = false;
@@ -122,9 +134,40 @@ void trip_init(void) {
     accel_lat_filt_g = 0.0f;
     long_accel_est_g = 0.0f;
     lat_accel_est_g = 0.0f;
+    ring_head = 0;
+    ring_count = 0;
     temp_n = 0;
     press_n = 0;
     hum_n = 0;
+}
+
+// store one GPS speed, then work out the push from the newest speed against
+// the one about TRIP_ACCEL_SPAN_S older. walks back adding up the gaps and
+// stops at the first fix far enough back; with fewer fixes than that it uses
+// the oldest one there is. at 1 Hz this is exactly fix to fix, as before
+static void trip_accel_from_speed(float speed_mps, float gap_s) {
+    ring_speed_mps[ring_head] = speed_mps;
+    ring_gap_s[ring_head] = gap_s;
+    uint32_t newest = ring_head;
+    ring_head = (ring_head + 1u) % TRIP_ACCEL_RING;
+    if (ring_count < TRIP_ACCEL_RING) {
+        ring_count++;
+    }
+
+    float span_s = 0.0f;
+    uint32_t i = newest;
+    for (uint32_t n = 1; n < ring_count; n++) {
+        span_s += ring_gap_s[i];     // the gap between i and the one before it
+        i = (i + TRIP_ACCEL_RING - 1u) % TRIP_ACCEL_RING;
+        // 0.9 so a fix landing a few ms early does not push it one further back
+        if (span_s >= (0.9f * TRIP_ACCEL_SPAN_S)) {
+            break;
+        }
+    }
+
+    if (span_s > 0.0f) {
+        long_accel_est_g = ((speed_mps - ring_speed_mps[i]) / span_s) / TRIP_G_TO_MPS2;
+    }
 }
 
 // one running average that does not lose precision on a long drive; adding
@@ -294,13 +337,10 @@ void trip_update_gps(const gps_fix_t *fix) {
     float new_speed_mps = fix_speed_kmh / 3.6f;
 
     // how hard the car is really accelerating, straight from how its speed
-    // changed; nothing to do with the accelerometer, which is the point
-    if (have_gps_speed && (since_fix_s > 0.0f)) {
-        long_accel_est_g = ((new_speed_mps - gps_speed_mps) / since_fix_s) /
-                           TRIP_G_TO_MPS2;
-    }
+    // changed over the last second; nothing to do with the accelerometer,
+    // which is the point
+    trip_accel_from_speed(new_speed_mps, have_gps_speed ? since_fix_s : 0.0f);
 
-    gps_speed_mps = new_speed_mps;
     have_gps_speed = true;
     speed_mps = new_speed_mps;
     since_fix_s = 0.0f;

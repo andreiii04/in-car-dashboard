@@ -193,6 +193,17 @@ void console_report(const console_status_t *s) {
             (unsigned long)uart_bus_rx_count(), (unsigned long)gst.sentences,
             (unsigned long)gst.rmc, (unsigned long)gst.gga, (unsigned long)gst.other,
             (unsigned long)gst.bad, (unsigned long)uart_bus_overruns());
+        // the faster link: rmc/s is the fix rate actually arriving, 5 once it
+        // took; acks should reach 2 (sentence set, fix rate) - the baud
+        // command never gets one
+        static uint32_t last_rmc;
+        gps_link_t link = gps_link();
+        printf("gps   link %s  rmc/s %lu  acks ok %lu failed %lu  tries %lu\n",
+            (link == GPS_LINK_FAST) ? "115200 5 Hz" :
+            (link == GPS_LINK_TRYING) ? "trying 115200" : "9600 1 Hz",
+            (unsigned long)(gst.rmc - last_rmc), (unsigned long)gst.acks_ok,
+            (unsigned long)gst.acks_failed, (unsigned long)gst.switch_tries);
+        last_rmc = gst.rmc;
         if (gst.rmc == 0u) {
             printf("gps   no RMC yet\n");
         } else {

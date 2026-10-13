@@ -55,6 +55,11 @@ static float gyro_bias_dps[3];
 // outside; subtracted from the reading so what is left is closer to gravity
 static float linear_accel_g[2];
 
+// the last sample in car axes, kept for trip - accel before the car's own
+// pushing is taken off, so it still has gravity and the push in it
+static float car_accel_g[3];
+static float car_gyro_dps[3];
+
 static float pitch_deg;
 static float roll_deg;
 static bool  accel_used;
@@ -93,6 +98,8 @@ void attitude_init(void) {
     attitude_identity();
     for (int i = 0; i < 3; i++) {
         gyro_bias_dps[i] = 0.0f;
+        car_accel_g[i] = 0.0f;
+        car_gyro_dps[i] = 0.0f;
     }
     linear_accel_g[0] = 0.0f;
     linear_accel_g[1] = 0.0f;
@@ -179,6 +186,12 @@ void attitude_update(float ax_g, float ay_g, float az_g,
 
     attitude_rotate(accel_in, accel);
     attitude_rotate(gyro_in, gyro);
+
+    // keep a copy for trip before the push comes off below
+    for (int i = 0; i < 3; i++) {
+        car_accel_g[i] = accel[i];
+        car_gyro_dps[i] = gyro[i];
+    }
 
     // take the car's own pushing back out; if nobody set it this is zero and
     // the line does nothing. it goes here, after the rotation, because the two
@@ -278,4 +291,14 @@ void attitude_get(attitude_t *out) {
     out->roll_deg = roll_deg;
     out->accel_used = accel_used;
     out->settled = settled;
+}
+
+void attitude_get_car_axes(float accel_g[3], float gyro_dps[3]) {
+    if ((accel_g == NULL) || (gyro_dps == NULL)) {
+        return;
+    }
+    for (int i = 0; i < 3; i++) {
+        accel_g[i] = car_accel_g[i];
+        gyro_dps[i] = car_gyro_dps[i];
+    }
 }

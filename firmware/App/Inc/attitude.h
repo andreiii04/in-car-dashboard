@@ -61,4 +61,11 @@ void attitude_update(float ax_g, float ay_g, float az_g,
 // copy out the angles as they stand now
 void attitude_get(attitude_t *out);
 
+// the last sample as the filter saw it - turned into car axes by the mount
+// rotation, gyro bias already off, gravity still in the accel. this is what
+// trip_update_motion wants; handing trip the unrotated reading instead left
+// sin(43.4) = 0.69 g of gravity on the forward axis with the board on the dash
+// (sessions 22-23). both arrays are 3 long; zeros until the first update
+void attitude_get_car_axes(float accel_g[3], float gyro_dps[3]);
+
 #endif // ATTITUDE_H

@@ -12,6 +12,7 @@
 //  /tmp/test_nmea && /tmp/test_nmea
 
 #include <stdio.h>
+#include <string.h>
 #include "nmea.h"
 
 static int fails = 0;
@@ -87,6 +88,32 @@ int main(void) {
     check("17 satellites used", g.sats_used == 17);
     check("hdop 0.64", near(g.hdop, 0.64, 1e-3));
     check("altitude 141.895 m", near(g.altitude_m, 141.895, 1e-3));
+
+    // the other direction - commands to the module. every expected line is the
+    // spec's own example, checksum included (protocol spec p42, p45, p51)
+    printf("PMTK commands come out the way the spec prints them\n");
+    char cmd[96];
+    nmea_build_command(cmd, sizeof(cmd), "PMTK220,1000");
+    check("$PMTK220,1000*1F", strcmp(cmd, "$PMTK220,1000*1F\r\n") == 0);
+    nmea_build_command(cmd, sizeof(cmd), "PMTK251,38400");
+    check("$PMTK251,38400*27", strcmp(cmd, "$PMTK251,38400*27\r\n") == 0);
+    nmea_build_command(cmd, sizeof(cmd),
+                       "PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0");
+    check("$PMTK314,0,1,0,...*35", strcmp(cmd,
+          "$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*35\r\n") == 0);
+    nmea_build_command(cmd, sizeof(cmd), "PMTK314,-1");
+    check("$PMTK314,-1*04", strcmp(cmd, "$PMTK314,-1*04\r\n") == 0);
+    check("too small a buffer gives 0", nmea_build_command(cmd, 10, "PMTK220,1000") == 0);
+
+    // and its answers, the spec's examples again (p34, p42, p51)
+    printf("PMTK001 answers\n");
+    uint16_t ack_cmd = 0;
+    uint8_t ack_flag = 0;
+    check("$PMTK001 is an answer", nmea_identify("$PMTK001,220,3,1000*1D") == NMEA_PMTK_ACK);
+    check("220 answered, flag 3", nmea_parse_ack("$PMTK001,220,3,1000*1D", &ack_cmd, &ack_flag) &&
+                                  ack_cmd == 220 && ack_flag == 3);
+    check("314 answered, flag 3", nmea_parse_ack("$PMTK001,314,3*36", &ack_cmd, &ack_flag) &&
+                                  ack_cmd == 314 && ack_flag == 3);
 
     printf("\n%s\n", fails ? "SOME CHECKS FAILED" : "all checks passed");
     return fails != 0;

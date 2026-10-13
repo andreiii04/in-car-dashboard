@@ -105,6 +105,11 @@ nmea_type_t nmea_identify(const char *sentence) {
         return NMEA_UNKNOWN;
     }
 
+    // the module's answer to a command has no talker, it is one fixed name
+    if (strncmp(sentence + 1, "PMTK001", 7) == 0) {
+        return NMEA_PMTK_ACK;
+    }
+
     // characters 1-2 are the talker, which flips between GP and GN depending on
     // which constellations gave the fix; only characters 3-5 matter here
     const char *type = sentence + 3;
@@ -194,4 +199,51 @@ bool nmea_parse_gga(const char *sentence, nmea_gga_t *out) {
     out->altitude_m  = nmea_empty(alt) ? 0.0f : (float)strtod(alt, NULL);
 
     return true;
+}
+
+bool nmea_parse_ack(const char *sentence, uint16_t *cmd, uint8_t *flag) {
+    if ((sentence == NULL) || (cmd == NULL) || (flag == NULL)) {
+        return false;
+    }
+
+    const char *c = nmea_field(sentence, 1);
+    const char *f = nmea_field(sentence, 2);
+    if (nmea_empty(c) || nmea_empty(f)) {
+        return false;
+    }
+
+    *cmd = (uint16_t)atoi(c);
+    *flag = (uint8_t)(*f - '0');
+    return true;
+}
+
+size_t nmea_build_command(char *out, size_t size, const char *body) {
+    if ((out == NULL) || (body == NULL)) {
+        return 0;
+    }
+
+    // $ + body + * + two hex digits + CR LF + the terminator
+    size_t body_len = strlen(body);
+    if ((body_len + 7u) > size) {
+        return 0;
+    }
+
+    // same XOR as nmea_checksum_ok, over everything between $ and *
+    uint8_t sum = 0;
+    for (size_t i = 0; i < body_len; i++) {
+        sum ^= (uint8_t)body[i];
+    }
+
+    static const char hex[] = "0123456789ABCDEF";
+    size_t n = 0;
+    out[n++] = '$';
+    memcpy(&out[n], body, body_len);
+    n += body_len;
+    out[n++] = '*';
+    out[n++] = hex[sum >> 4];
+    out[n++] = hex[sum & 0x0Fu];
+    out[n++] = '\r';
+    out[n++] = '\n';
+    out[n] = '\0';
+    return n;
 }

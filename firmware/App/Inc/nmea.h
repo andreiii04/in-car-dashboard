@@ -4,19 +4,24 @@
 // - NMEA 0183 is the text format the GPS speaks; each line is one sentence
 // - pure C, no HAL and no hardware, so this can be compiled and tested on a PC
 //   by feeding it recorded sentences
-// - only RMC and GGA are handled; everything else is ignored
+// - only RMC and GGA are handled, plus the PMTK001 answer the module gives a
+//   command; everything else is ignored
+// - also builds the other direction: a PMTK command with its checksum, ready
+//   to send to the module
 //
 
 #ifndef NMEA_H
 #define NMEA_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef enum {
     NMEA_UNKNOWN = 0,
     NMEA_RMC,
     NMEA_GGA,
+    NMEA_PMTK_ACK,   // $PMTK001 - the module answering one of our commands
 } nmea_type_t;
 
 // RMC - position, speed, course, UTC date and time
@@ -48,5 +53,15 @@ nmea_type_t nmea_identify(const char *sentence);
 
 bool nmea_parse_rmc(const char *sentence, nmea_rmc_t *out);
 bool nmea_parse_gga(const char *sentence, nmea_gga_t *out);
+
+// $PMTK001,<cmd>,<flag> - which command it answers and how it went; flag 3 is
+// "valid packet, and action succeeded", 0-2 are the ways it can fail
+// (protocol spec p34)
+bool nmea_parse_ack(const char *sentence, uint16_t *cmd, uint8_t *flag);
+
+// wrap a command body like "PMTK220,200" into "$PMTK220,200*2F\r\n" - the $,
+// the checksum over the body, the line ending. returns the length written, 0
+// if it does not fit in out
+size_t nmea_build_command(char *out, size_t size, const char *body);
 
 #endif // NMEA_H

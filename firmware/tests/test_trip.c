@@ -34,6 +34,10 @@ static int near(float a, float b, float tol) {
     return d < tol;
 }
 
+static float trip_abs_g(float v) {
+    return (v < 0.0f) ? -v : v;
+}
+
 #define DEG (float)(M_PI / 180.0)
 #define DT  (1.0f / 104.0f)
 #define HZ  104
@@ -184,6 +188,31 @@ int main(void) {
     }
     check("forward push from the GPS speed changing",
           near(trip_long_accel_g(), 10.0f / 9.80665f, 0.02f));
+
+    // 5 Hz GPS: speed noise of +-0.5 km/h flipping every fix. fix to fix that
+    // is 1 km/h in 0.2 s, 0.278 / 0.2 / 9.81 = 0.142 g of push that is not
+    // there. over a second, five fixes back, the flip is the same 1 km/h in
+    // 1 s, 0.028 g - a fifth
+    trip_init();
+    for (int i = 0; i < 15; i++) {
+        gps_fix_t f = fix_at(((i % 2) == 0) ? 50.5f : 49.5f);
+        trip_update_gps(&f);
+        coast(0, 0, 0.2f);
+    }
+    check("5 Hz noise stays a fifth of fix to fix",
+          trip_abs_g(trip_long_accel_g()) < 0.03f);
+
+    // a steady 2 m/s2 pull at 5 Hz, 7.2 km/h more every second. coast(0.2)
+    // runs 20 whole samples, 0.192 s, so the speed steps by that, not 0.2
+    trip_init();
+    for (int i = 0; i < 15; i++) {
+        float t_s = (float)i * 20.0f * DT;
+        gps_fix_t f = fix_at(36.0f + (7.2f * t_s));
+        trip_update_gps(&f);
+        coast(0, 0, 0.2f);
+    }
+    check("a real 2 m/s2 at 5 Hz is still 0.204 g",
+          near(trip_long_accel_g(), 2.0f / 9.80665f, 0.005f));
 
     trip_init();
     drive(72.0f, 0, 0, 0, 0, 10.0f, 3.0f);      // 20 m/s while turning 10 deg/s

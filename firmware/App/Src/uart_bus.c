@@ -16,9 +16,14 @@ extern UART_HandleTypeDef huart1;
 // power of two so the wrap is a cheap mask instead of a divide. 2048 bytes is
 // ~2.1 s at 9600 baud - a record write is 5 blocks and the SD spec lets each
 // one stay busy 250 ms, and sessions 6 and 7 already saw a 245 ms write
-// against the ~265 ms a 256-byte ring lasted
+// against the ~265 ms a 256-byte ring lasted. at 115200 the baud stops
+// mattering, what fills it is what the module sends: ~1.2 kB/s at 5 Hz with
+// RMC + GGA every fix and GSV once a second, so still ~1.7 s
 #define UART_BUS_RING_SIZE 2048
 #define UART_BUS_RING_MASK (UART_BUS_RING_SIZE - 1)
+
+// longest a send may take - the longest command is ~60 bytes, 63 ms at 9600
+#define UART_BUS_TX_TIMEOUT_MS 200u
 
 static uint8_t rx_byte;                        // HAL drops each new byte here
 static volatile uint8_t ring[UART_BUS_RING_SIZE];
@@ -79,6 +84,38 @@ bool uart_bus_read_byte(uint8_t *out) {
     *out = ring[tail];
     tail = (uint16_t)((tail + 1u) & UART_BUS_RING_MASK);
     return true;
+}
+
+uart_bus_status_t uart_bus_send(const uint8_t *data, uint16_t len) {
+    if ((data == NULL) || (len == 0u)) {
+        return UART_BUS_ERR_HAL;
+    }
+    // TX and RX are separate states in HAL, so this runs while the receive
+    // interrupt keeps filling the ring
+    if (HAL_UART_Transmit(&huart1, (uint8_t *)data, len, UART_BUS_TX_TIMEOUT_MS) != HAL_OK) {
+        return UART_BUS_ERR_HAL;
+    }
+    return UART_BUS_OK;
+}
+
+uart_bus_status_t uart_bus_set_baud(uint32_t baud) {
+    // stop the receive interrupt first; HAL_UART_Init refuses to touch a busy
+    // UART, and the ring below must not be written while it is reset
+    (void)HAL_UART_AbortReceive(&huart1);
+
+    huart1.Init.BaudRate = baud;
+    if (HAL_UART_Init(&huart1) != HAL_OK) {
+        return UART_BUS_ERR_HAL;
+    }
+
+    // the interrupt is stopped, so the main loop can reset both ends safely
+    head = 0;
+    tail = 0;
+
+    if (HAL_UART_Receive_IT(&huart1, &rx_byte, 1) != HAL_OK) {
+        return UART_BUS_ERR_HAL;
+    }
+    return UART_BUS_OK;
 }
 
 uint32_t uart_bus_overruns(void) {
