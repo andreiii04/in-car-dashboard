@@ -46,11 +46,13 @@ Protection on the 5 V input: a series Schottky against reverse polarity, a TVS d
   <img src="docs/3Dbottom.jpeg" width="49%" alt="Board, bottom view, with the IMU on the underside">
 </p>
 
-**Display mounting.** The display module is not soldered to the board and does not appear in the renders: female 2.54 mm sockets are soldered into all 18 LCD1 positions (the 14-pin display and touch row and the 4-pin SD row), and male headers on the module's own PCB plug into them, so the screen stacks face-up on top of the main board and can be lifted off. The board's four M3 holes match the module's 44 × 76.08 mm hole pattern, for standoffs between the two.
+**Display mounting.** The display module is not soldered to the board and does not appear in the renders: female 2.54 mm sockets are soldered into all 18 LCD1 positions (the 14-pin display and touch row and the 4-pin SD row), and male headers on the module's own PCB plug into them, so the screen stacks face-up on top of the main board and can be lifted off. The board's four M3 holes match the module's 44 × 76.08 mm hole pattern, so one set of screws through the lid clamps the display, printed spacer tubes and board together (see Case).
 
 ### Case
 
-A 3D-printed bottom tray holds the board by its walls, with the USB-C opening on one side, intake vents at the BME680 end and exhaust vents at the far end. Source: [`hardware/case/bottom_tray.FCStd`](hardware/case/bottom_tray.FCStd) (FreeCAD 1.1), described in [`docs/dash_case.md`](docs/dash_case.md). The top case with the display bezel and SD slot is not designed yet.
+A two-part 3D-printed enclosure. The bottom tray holds the board on four bosses, with the USB-C opening on one side, intake vents at the BME680 end and exhaust vents at the far end. The lid carries the display window and a notch for the SD card. Four printed spacer tubes sit between the board and the display, and four countersunk self-tapping screws clamp the whole stack from the lid down into the bosses, so the only visible fasteners are flush in the lid. The lid stays clear of the lifted GPS antenna. The tray is printed and test-fitted; the lid and spacers are modelled but not printed yet.
+
+Sources (FreeCAD 1.1): [`bottom_tray.FCStd`](hardware/case/bottom_tray.FCStd), [`top_case.FCStd`](hardware/case/top_case.FCStd), [`spacer_tube.FCStd`](hardware/case/spacer_tube.FCStd), with a STEP export of each next to it for other CAD tools. Dimensions, load path and print settings are in [`docs/dash_case.md`](docs/dash_case.md).
 
 ![Board in the bottom tray](docs/case_pcb_side.jpeg)
 
@@ -110,7 +112,7 @@ firmware/            STM32 firmware (CMake, CubeMX project dashboard_firmware.io
 hardware/
   pcb/               KiCad 10 project in_car_dashboard
   libraries/         custom symbols, footprints and 3D models used by the board
-  case/              FreeCAD source of the case tray
+  case/              FreeCAD sources and STEP exports of the tray, lid and spacer tubes
 docs/                case design note, the car's numbers and what each one is used for, my notes
                      from building it, schematic and board pictures, renders, BOM
 ```
@@ -139,7 +141,7 @@ Each file in `tests/` has its own line in its header.
 ## Opening the hardware
 
 - **PCB:** open `hardware/pcb/in_car_dashboard.kicad_pro` in KiCad 10. The project's symbol and footprint paths are relative to the project, so the custom parts in `hardware/libraries/` resolve on any machine; everything else comes from KiCad's standard libraries. The 3D models of the custom parts are not included, since they come from third parties: the board opens, checks and exports normally, and those parts just show without a body in the 3D viewer. To get them back, download the STEP models from the manufacturers and put each in `hardware/libraries/<library>/<library>.3dshapes/` under the file name its footprint asks for.
-- **Case:** open `hardware/case/bottom_tray.FCStd` in FreeCAD 1.1. It was printed in one piece, floor down, no supports.
+- **Case:** open the `.FCStd` files in `hardware/case/` in FreeCAD 1.1, or the `.step` files in any CAD tool. The tray prints floor down, the lid top face down and the spacer tubes upright, all without supports.
 
 ## Datasheets
 
@@ -163,9 +165,10 @@ Not included in the repository; all are available from the manufacturers:
 Working on the bench and in the car. Bring-up is complete: console, sensors, calibration, GPS, attitude, interrupt-paced sampling, display, SD logging and the main loop. The first long drive, 118.5 km, matched the route distance and ran with every fault counter at zero.
 
 Still to do:
+- Moving the main loop onto FreeRTOS
 - Air-quality index through Bosch's BSEC library, which is closed source and won't be in this repository
-- Tuning the filters against logged drives, and a faster GPS rate
-- The top case
+- Tuning the filters against logged drives
+- Printing and fitting the lid
 - A second screen for pitch and roll off-road
 
 ## License

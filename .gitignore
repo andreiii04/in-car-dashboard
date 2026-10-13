@@ -23,10 +23,12 @@ docs/*
 # 3D models of the custom parts - third-party files, kept on disk, not published
 hardware/libraries/*/*.3dshapes/
 
-# hardware outputs - kept on disk, not published
+# hardware outputs - kept on disk, not published. the case STEP exports stay
+# public, so the case opens in any CAD tool, not only FreeCAD
 hardware/pcb/fab/
 hardware/case/*.stl
 hardware/case/*.3mf
+!hardware/case/*.step
 
 # kicad local and temporary files
 *-backups/

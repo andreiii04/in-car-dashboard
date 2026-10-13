@@ -15,6 +15,7 @@ two words that come up a lot:
               5      19 sep         first drive, 18 min
               6-8    28 sep-3 oct   back on the bench with the fixes from 5
               17     3 oct          first long drive, 2 h 19 min, 118.5 km
+              22-23  4 oct          second long drive, on the dash calibration
 
 
 ## the layers

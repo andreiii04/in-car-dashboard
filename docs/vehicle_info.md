@@ -204,6 +204,9 @@ gyro X read 0.13-0.26 in the car against 0.446 on the bench. kept the bench
 one - X never settles, it moves with temperature. ~0.4 deg of standing roll
 error worst case.
 
+since 13 oct the flat set is back in, the board is on the table for a while.
+the car set waits in the comment now - paste it back before the next drive.
+
 
 ## the car specs
 
