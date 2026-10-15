@@ -930,7 +930,7 @@ wrong.
 
 ## the car itself is a number now
 
-App/Inc/vehicle_axes.h holds everything specific to the car and the mount, so
+App/fusion/vehicle_axes.h holds everything specific to the car and the mount, so
 moving the board to another car is one file and a rebuild.
 
 the car is an audi a4 b6 avant 1.8T 190hp quattro, 2004, 6-speed manual.
@@ -1999,8 +1999,8 @@ the panel cannot draw text, it only takes pixels. so a font is a table of
 little pictures, one per character, 1 bit per pixel, packed in rows.
 
 i did not draw them. tools/gen_fonts.py takes DejaVu Sans Bold - free to
-embed - and rasterises it with FreeType through matplotlib, which the
-python.org 3.12 python on this mac happens to have. three sizes, 12, 18 and
+embed - and rasterises it with FreeType through matplotlib (brew install
+python-matplotlib, then plain python3). three sizes, 12, 18 and
 26 px cells. every glyph in a font has the same height and shares a baseline
 so text lines up; widths are proportional. about 6.5 KB of flash.
 
@@ -2444,12 +2444,12 @@ three passed in one session - the panel, the card, and the whole loop running
 together for eight minutes with nothing missed.
 
 next: a new ml2032 (or D3 out and a CR2032), a drive with references (trip meter, speedo, a
-roundabout, a signed grade, known altitudes), then BSEC, tuning, the rtos, the
+roundabout, a signed grade, known altitudes), then the rtos, BSEC, tuning, the
 top case. and the gps needs open sky: time to first fix, altitude, and whether
 the 3 s clock offset and the age walk survive a proper fix.
 
-the lateral fix is flashed - every sample now, not once a second. the rest
-reading in the header is the car one now, 43 deg nose up on the dash, taken
-both ways round on a slope (vehicle_info.md). the flat one is in a comment
-above it. the gyro offset does not care how the board sits, so the tray value
-stays.
+the lateral fix is flashed - every sample now, not once a second. the car rest
+reading, 43 deg nose up on the dash, is taken both ways round on a slope
+(vehicle_info.md). since 13 oct the board is back on the table, so the flat
+one is in the header and the car one waits in a comment. the gyro offset
+does not care how the board sits, so the tray value stays.

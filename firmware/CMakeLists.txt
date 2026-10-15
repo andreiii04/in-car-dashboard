@@ -45,40 +45,45 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    App/Src/i2c_bus.c
-    App/Src/lsm6dso_platform.c
-    App/Src/bme68x_platform.c
-    App/Src/imu.c
-    App/Src/env.c
-    App/Src/uart_bus.c
-    App/Src/nmea.c
-    App/Src/gps.c
-    App/Src/attitude.c
-    App/Src/trip.c
-    App/Src/elevation.c
-    App/Src/usb_serial.c
-    App/Src/lcd.c
-    App/Src/gfx.c
-    App/Src/screen.c
-    App/Src/sd_crc.c
-    App/Src/sd_spi.c
-    App/Src/session_record.c
-    App/Src/session_log.c
-    App/Src/console.c
-    App/Src/bench_cal.c
-    App/Fonts/font_small.c
-    App/Fonts/font_medium.c
-    App/Fonts/font_large.c
-    App/Drivers/lsm6dso/lsm6dso_reg.c
-    App/Drivers/bme68x/bme68x.c
+    App/sensors/i2c_bus.c
+    App/sensors/lsm6dso_platform.c
+    App/sensors/bme68x_platform.c
+    App/sensors/imu.c
+    App/sensors/env.c
+    App/gps/uart_bus.c
+    App/gps/nmea.c
+    App/gps/gps.c
+    App/fusion/attitude.c
+    App/fusion/trip.c
+    App/fusion/elevation.c
+    App/console/usb_serial.c
+    App/display/lcd.c
+    App/display/gfx.c
+    App/display/screen.c
+    App/storage/sd_crc.c
+    App/storage/sd_spi.c
+    App/storage/session_record.c
+    App/storage/session_log.c
+    App/console/console.c
+    App/sensors/bench_cal.c
+    App/fonts/font_small.c
+    App/fonts/font_medium.c
+    App/fonts/font_large.c
+    App/drivers/lsm6dso/lsm6dso_reg.c
+    App/drivers/bme68x/bme68x.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
-    App/Inc
-    App/Drivers/lsm6dso
-    App/Drivers/bme68x
+    App/sensors
+    App/gps
+    App/fusion
+    App/display
+    App/storage
+    App/console
+    App/drivers/lsm6dso
+    App/drivers/bme68x
 )
 
 # Add project symbols (macros)

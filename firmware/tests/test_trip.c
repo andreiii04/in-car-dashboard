@@ -9,8 +9,8 @@
 //
 
 // how to run
-//  cc -std=c11 -Wall -Wextra -I App/Inc tests/test_trip.c App/Src/trip.c -lm
-//  -o /tmp/test_trip && /tmp/test_trip
+//  cc -std=c11 -Wall -Wextra -I App/fusion -I App/gps tests/test_trip.c
+//  App/fusion/trip.c -lm -o /tmp/test_trip && /tmp/test_trip
 
 #include <stdio.h>
 #include <math.h>

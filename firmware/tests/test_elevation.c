@@ -8,8 +8,8 @@
 //
 
 // how to run
-//  cc -std=c11 -Wall -Wextra -I App/Inc tests/test_elevation.c
-//  App/Src/elevation.c -lm -o /tmp/test_elevation && /tmp/test_elevation
+//  cc -std=c11 -Wall -Wextra -I App/fusion tests/test_elevation.c
+//  App/fusion/elevation.c -lm -o /tmp/test_elevation && /tmp/test_elevation
 
 #include <stdio.h>
 #include "elevation.h"

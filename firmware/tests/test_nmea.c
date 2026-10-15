@@ -8,7 +8,7 @@
 //
 
 // how to run
-//  cc -std=c11 -Wall -Wextra -I App/Inc tests/test_nmea.c App/Src/nmea.c -o
+//  cc -std=c11 -Wall -Wextra -I App/gps tests/test_nmea.c App/gps/nmea.c -o
 //  /tmp/test_nmea && /tmp/test_nmea
 
 #include <stdio.h>

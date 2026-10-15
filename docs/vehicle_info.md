@@ -1,7 +1,7 @@
 # vehicle info
 
 everything the firmware knows about the car. it all lives in one file,
-App/Inc/vehicle_axes.h, so moving to a different car is that file and a
+App/fusion/vehicle_axes.h, so moving to a different car is that file and a
 rebuild. nothing else in App/ has a car-specific number in it.
 
 three groups, kept apart because they get filled in at different times and in

@@ -9,8 +9,8 @@
 //
 
 // how to run
-//  cc -std=c11 -Wall -Wextra -I App/Inc tests/test_attitude.c App/Src/attitude.c -lm -o
-//  /tmp/test_attitude && /tmp/test_attitude
+//  cc -std=c11 -Wall -Wextra -I App/fusion tests/test_attitude.c
+//  App/fusion/attitude.c -lm -o /tmp/test_attitude && /tmp/test_attitude
 
 #include <stdio.h>
 #include <math.h>

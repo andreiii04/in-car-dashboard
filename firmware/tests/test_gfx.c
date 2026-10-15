@@ -9,8 +9,8 @@
 //
 
 // how to run
-//  cc -std=c11 -Wall -Wextra -I App/Inc tests/test_gfx.c App/Src/gfx.c
-//  App/Fonts/font_small.c App/Fonts/font_medium.c App/Fonts/font_large.c
+//  cc -std=c11 -Wall -Wextra -I App/display tests/test_gfx.c App/display/gfx.c
+//  App/fonts/font_small.c App/fonts/font_medium.c App/fonts/font_large.c
 //  -lm -o /tmp/test_gfx && /tmp/test_gfx
 
 #include <math.h>

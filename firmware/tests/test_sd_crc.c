@@ -9,7 +9,7 @@
 //
 
 // how to run
-//  cc -std=c11 -Wall -Wextra -I App/Inc tests/test_sd_crc.c App/Src/sd_crc.c
+//  cc -std=c11 -Wall -Wextra -I App/storage tests/test_sd_crc.c App/storage/sd_crc.c
 //  -o /tmp/test_sd_crc && /tmp/test_sd_crc
 
 #include <stdio.h>

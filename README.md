@@ -91,7 +91,7 @@ The loop is paced by the IMU's own data-ready interrupt at about 105 Hz. Each sa
 | Storage | `sd_spi` (SD SPI mode, CRC on every command and block) → FatFs → `session_record` → `session_log` |
 | Console | `usb_serial` (printf over USB CDC) → `console` |
 
-Everything with no hardware in it is host-testable and tested on a PC, 257 checks across seven modules: `nmea`, `attitude`, `trip`, `elevation`, `gfx`, `sd_crc`, `session_record`. Expected values come from independent derivations rather than restatements of the code under test. Car- and mount-specific constants (axis map, calibration, wheelbase, track, centre-of-gravity height) live in one header, `firmware/App/Inc/vehicle_axes.h`, explained in [`docs/vehicle_info.md`](docs/vehicle_info.md).
+Everything with no hardware in it is host-testable and tested on a PC, 257 checks across seven modules: `nmea`, `attitude`, `trip`, `elevation`, `gfx`, `sd_crc`, `session_record`. Expected values come from independent derivations rather than restatements of the code under test. Car- and mount-specific constants (axis map, calibration, wheelbase, track, centre-of-gravity height) live in one header, `firmware/App/fusion/vehicle_axes.h`, explained in [`docs/vehicle_info.md`](docs/vehicle_info.md).
 
 Some decisions worth knowing before changing anything:
 - **Pitch and roll come from accelerometer and gyroscope fused.** The car's own acceleration is subtracted first, using GPS speed and speed × yaw rate, so braking and cornering don't read as tilt.
@@ -105,7 +105,15 @@ The reasoning behind these and most other choices, written down while I learned 
 
 ```
 firmware/            STM32 firmware (CMake, CubeMX project dashboard_firmware.ioc)
-  App/               hand-written code: Inc/, Src/, Drivers/ (vendor), Fonts/ (generated)
+  App/               hand-written code, one folder per subsystem:
+    sensors/         I2C bus, LSM6DSO and BME680
+    gps/             UART ring, NMEA parser, GPS module
+    fusion/          pitch/roll, trip stats, elevation, the car's constants
+    display/         ILI9341 driver, band renderer, screen layout
+    storage/         SD card over SPI, session record and log
+    console/         USB serial console
+    drivers/         vendor sensor drivers (ST, Bosch), unmodified
+    fonts/           generated bitmap fonts
   Core/ Drivers/ FATFS/ Middlewares/ USB_DEVICE/   CubeMX- and ST-generated
   tests/             host tests, each file carries its own compile line
   tools/             font generator
@@ -133,7 +141,7 @@ Host tests build with any C11 compiler. For example:
 
 ```sh
 cd firmware
-cc -std=c11 -Wall -Wextra -I App/Inc tests/test_trip.c App/Src/trip.c -lm -o /tmp/test_trip && /tmp/test_trip
+cc -std=c11 -Wall -Wextra -I App/fusion -I App/gps tests/test_trip.c App/fusion/trip.c -lm -o /tmp/test_trip && /tmp/test_trip
 ```
 
 Each file in `tests/` has its own line in its header.

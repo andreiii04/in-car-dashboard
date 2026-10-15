@@ -15,8 +15,10 @@
 //
 
 // how to run
-//  cc -std=c11 -Wall -Wextra -I App/Inc tests/test_session_record.c
-//  App/Src/session_record.c -o /tmp/test_session_record && /tmp/test_session_record
+//  cc -std=c11 -Wall -Wextra -I App/storage -I App/fusion -I App/gps
+//  -I App/sensors -I App/display tests/test_session_record.c
+//  App/storage/session_record.c -o /tmp/test_session_record
+//  && /tmp/test_session_record
 
 #include <stdio.h>
 #include <stdlib.h>

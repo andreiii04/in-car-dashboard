@@ -2,13 +2,12 @@
 #
 # gen_fonts.py - turns a TTF into the bitmap font tables gfx.c draws with
 #
-# - run it from the repo root with the python.org 3.12 python, the one that
-#   has matplotlib installed:
-#     /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 tools/gen_fonts.py
+# - run it with python3 after `brew install python-matplotlib`, from firmware/:
+#     python3 tools/gen_fonts.py
 # - matplotlib is only used for two things: its FreeType binding, which does the
 #   rasterising, and the DejaVu Sans Bold it ships (Bitstream Vera licence, free
 #   to embed); nothing else needs installing
-# - output is App/Fonts/font_*.c, one table per size, checked in so the firmware
+# - output is App/fonts/font_*.c, one table per size, checked in so the firmware
 #   build never depends on this script
 # - glyphs are 1-bit, rows packed MSB first, every glyph the same height (the
 #   cell) with a shared baseline, so text lines up whatever it says
@@ -23,7 +22,7 @@ from matplotlib.ft2font import FT2Font, FT2Image, LoadFlags
 
 FONT_DIR = os.path.join(os.path.dirname(matplotlib.__file__), 'mpl-data', 'fonts', 'ttf')
 FONT_PATH = os.path.join(FONT_DIR, 'DejaVuSans-Bold.ttf')
-OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'App', 'Fonts')
+OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'App', 'fonts')
 
 ASCII = ''.join(chr(c) for c in range(32, 127))
 
