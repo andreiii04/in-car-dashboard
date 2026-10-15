@@ -26,6 +26,7 @@
 #include "uart_bus.h"
 #include "imu.h"
 #include "env.h"
+#include "air.h"
 #include "gps.h"
 #include "vehicle_axes.h"
 #include "attitude.h"
@@ -37,6 +38,7 @@
 #include "sd_spi.h"
 #include "session_log.h"
 #include "session_record.h"
+#include "air_store.h"
 #include "console.h"
 #include "bench_cal.h"
 
@@ -44,9 +46,10 @@
 #define IMU_WAIT_MS      20u      // longest the imu task sleeps without an edge
 #define IMU_QUIET_MS     50u      // no edge this long - read once to drop the latched line
 #define GPS_PERIOD_MS    10u      // ~12 bytes at the 5 Hz load; the ring holds ~1.7 s
-#define ENV_PERIOD_MS    3000u    // one BME680 measurement every 3 s
+#define ENV_PERIOD_MS    3000u    // one BME680 measurement every 3 s, BSEC's LP rate
 #define ENV_GIVE_UP_MS   1000u    // a measurement that never finishes is dropped after this
 #define ENV_RETRY_MS     5u       // asked too early - look again this much later
+#define ENV_SAVE_MS      600000u  // BSEC's learned state to the card every 10 min
 #define DISP_PERIOD_MS   50u      // the gauge dot at 20 Hz; the numbers change slower anyway
 #define CON_PERIOD_MS    1000u
 #define LOG_TICK_MS      1000u    // how often the log task looks
@@ -68,7 +71,7 @@
 #define IMU_STACK        2048u
 #endif
 #define GPS_STACK        1536u
-#define ENV_STACK        1536u    // 1024 left only 236 bytes on the board (15 Oct)
+#define ENV_STACK        2560u    // BSEC and the env task used ~1.3 KB on the board (15 Oct)
 #define DISP_STACK       2048u
 #define CON_STACK        2560u
 #define LOG_STACK        3072u
@@ -110,6 +113,9 @@ static uint32_t   boot_tick;       // boot, read-only afterwards
 static app_imu_t  imu_out;         // imu
 static app_gps_t  gps_out;         // gps
 static app_env_t  env_out;         // env
+static uint8_t    env_air_state[AIR_STATE_MAX];  // env - BSEC's state on its way to the card
+static uint8_t    log_air_state[AIR_STATE_MAX];  // log - the same, taken off app_state
+static uint8_t    boot_air_state[AIR_STATE_MAX]; // boot - the state read off the card
 static app_disp_t disp_out;        // disp
 static app_log_t  log_out;         // log, first written by boot
 static app_state_t disp_view;      // disp
@@ -259,8 +265,14 @@ static void imu_task(void *arg) {
                                   : (float)ENV_PERIOD_MS / 1000.0f;
             last_env_tick = env.tick;
             env_have = true;
-            trip_update_env(env.sample.temperature_c, env.sample.pressure_hpa,
-                            env.sample.humidity_pct);
+            // temperature and humidity with the board's own heat taken off;
+            // pressure is the raw one, BSEC does nothing to it
+            trip_update_env(env.air.temperature_c, env.sample.pressure_hpa,
+                            env.air.humidity_pct);
+            if (env.air.valid) {
+                trip_update_air(env.air.iaq, env.air.eco2_ppm, env.air.bvoc_ppm,
+                                env.air.iaq_accuracy);
+            }
             elev_update(env.sample.pressure_hpa, latest.fix_valid, latest.altitude_m, dt_s);
         }
 
@@ -324,19 +336,60 @@ static void gps_task(void *arg) {
 
 // ---- env task ---------------------------------------------------------------
 
-// one BME680 measurement: trigger, sleep while it runs (~143 ms), collect.
-// the same two halves the superloop used, with a sleep in the gap. each half
-// is timed on its own, so the console shows the work and not the sleep
-static void env_measure(void) {
+// BSEC's clock: nanoseconds since boot in 64 bits, built from HAL tick
+// differences so it keeps counting past the tick's 49-day wrap
+static int64_t env_clock_ns(void) {
+    static uint32_t last_tick;
+    static int64_t ms;
+    uint32_t now = HAL_GetTick();
+
+    ms += (int64_t)(uint32_t)(now - last_tick);
+    last_tick = now;
+    return ms * 1000000LL;
+}
+
+// keep BSEC's codes: 0 is fine, 100 is a late call, anything else is counted
+static void env_note_code(int32_t code) {
+    if (code == 0) {
+        return;
+    }
+    env_out.air_code = code;
+    if (code == 100) {
+        env_out.air_late++;
+    } else {
+        env_out.air_bad++;
+    }
+}
+
+// one BSEC step: ask it what to do, trigger, sleep while the sensor measures
+// (~150-250 ms), collect, hand the reading to BSEC. the I2C mutex is held for
+// the two transfers only - BSEC's own maths runs with the bus free
+static void env_cycle(int64_t now_ns, int64_t *next_ns) {
     uint32_t start = HAL_GetTick();
     uint32_t wait_ms = 0;
     uint32_t t0 = DWT->CYCCNT;
+    env_settings_t set;
     env_sample_t sample;
+    air_sample_t air;
     app_env_msg_t msg;
     env_status_t s;
+    bool measure = false;
+    int32_t code;
+
+    code = air_control(now_ns, &set, &measure, next_ns);
+    env_note_code(code);
+    if (code < 0) {
+        // nothing usable came back; ask again one period on
+        *next_ns = now_ns + ((int64_t)ENV_PERIOD_MS * 1000000LL);
+    }
+    if (!measure) {
+        app_state_note_wake(APP_TASK_ENV, us_since(t0));
+        return;
+    }
+    env_out.set = set;
 
     osMutexAcquire(app_i2c_mutex, osWaitForever);
-    s = env_start(&wait_ms);
+    s = env_start(&set, &wait_ms);
     osMutexRelease(app_i2c_mutex);
     app_state_note_wake(APP_TASK_ENV, us_since(t0));
     if (s != ENV_OK) {
@@ -355,37 +408,82 @@ static void env_measure(void) {
             break;
         }
         if ((HAL_GetTick() - start) > ENV_GIVE_UP_MS) {
-            env_out.errors++;   // stuck; the next period triggers again
+            env_out.errors++;   // stuck; the next step triggers again
             return;
         }
         osDelay(ENV_RETRY_MS);  // not done yet, look again soon
     }
     if (s != ENV_OK) {
-        env_out.errors++;       // bus error; try again next period
+        env_out.errors++;       // bus error; try again next step
         return;
     }
 
+    // stamped with the time BSEC was asked, which is when it said to measure
+    t0 = DWT->CYCCNT;
+    code = air_process(now_ns, &sample, &air);
+    env_note_code(code);
+    app_state_note_wake(APP_TASK_ENV, us_since(t0));
+
     env_out.have = true;
     env_out.sample = sample;
+    env_out.air = air;
     msg.sample = sample;
+    msg.air = air;
     msg.tick = HAL_GetTick();
     if (osMessageQueuePut(app_env_queue, &msg, 0u, 0u) != osOK) {
         env_out.dropped++;
     }
 }
 
+// every 10 min, BSEC's learned state goes to the log task for the card; the
+// log task decides whether the card may take it
+static void env_save_state(uint32_t *last_save) {
+    uint16_t len = 0;
+    uint32_t now = HAL_GetTick();
+
+    if ((boot.air_s != AIR_OK) || ((now - *last_save) < ENV_SAVE_MS)) {
+        return;
+    }
+    *last_save = now;
+    uint32_t t0 = DWT->CYCCNT;
+    if (air_get_state(env_air_state, &len)) {
+        app_state_put_air_state(env_air_state, len);
+        env_out.air_state_tick = now;
+    }
+    app_state_note_wake(APP_TASK_ENV, us_since(t0));
+}
+
+// sleep until BSEC's next call, but never longer than one period, so the
+// task still checks in with the watchdog if something sends next_ns far out
+static void env_sleep_until(int64_t next_ns) {
+    int64_t left_ms = (next_ns - env_clock_ns() + 999999LL) / 1000000LL;
+
+    if (left_ms <= 0) {
+        return;   // already due
+    }
+    if (left_ms > (int64_t)ENV_PERIOD_MS) {
+        left_ms = ENV_PERIOD_MS;
+    }
+    osDelay((uint32_t)left_ms);
+}
+
 static void env_task(void *arg) {
-    uint32_t next = osKernelGetTickCount();
+    int64_t next_ns = env_clock_ns();
+    uint32_t last_save = HAL_GetTick();
 
     (void)arg;
 
     for (;;) {
-        if (boot.env_s == ENV_OK) {
-            env_measure();
+        int64_t now_ns = env_clock_ns();
+        if (boot.env_s != ENV_OK) {
+            next_ns = now_ns + ((int64_t)ENV_PERIOD_MS * 1000000LL);
+        } else if (now_ns >= next_ns) {
+            env_cycle(now_ns, &next_ns);
+            env_save_state(&last_save);
             app_state_put_env(&env_out);
         }
         watchdog_checkin(APP_TASK_ENV);
-        sleep_until(&next, ENV_PERIOD_MS);
+        env_sleep_until(next_ns);
     }
 }
 
@@ -412,11 +510,12 @@ static void gather_screen(screen_data_t *d, const app_state_t *s) {
     d->coasting = t->coasting;
 
     d->env_valid = s->env.have;
-    d->temp_c = s->env.sample.temperature_c;
-    d->hum_pct = s->env.sample.humidity_pct;
     d->press_hpa = s->env.sample.pressure_hpa;
-    d->gas_valid = s->env.sample.gas_valid;
-    d->gas_kohm = s->env.sample.gas_resistance_ohm / 1000.0f;
+    d->temp_c = s->env.air.temperature_c;     // with the board's own heat taken off
+    d->hum_pct = s->env.air.humidity_pct;
+    d->iaq_valid = s->env.air.valid;
+    d->iaq = s->env.air.iaq;
+    d->iaq_accuracy = s->env.air.iaq_accuracy;
 
     d->duration_s = t->duration_s;
     d->sd_ok = s->log.stats.mounted;
@@ -557,6 +656,13 @@ static void log_task(void *arg) {
         uint32_t t0 = DWT->CYCCNT;
         uint32_t now = HAL_GetTick();
 
+        // BSEC's state, when the env task has handed one over; air_store
+        // refuses it unless the card was there at boot
+        uint16_t air_len = 0;
+        if (app_state_take_air_state(log_air_state, &air_len)) {
+            (void)air_store_save(log_air_state, air_len);
+        }
+
         // rewrite this drive's record every 10 s, or keep looking for a card
         // every 5 s until one turns up
         if (session_log_ready()) {
@@ -577,6 +683,7 @@ static void log_task(void *arg) {
 
         session_log_get_stats(&log_out.stats);
         sd_spi_get_stats(&log_out.sd);
+        air_store_get_stats(&log_out.air_store);
         app_state_put_log(&log_out);
 
         watchdog_checkin(APP_TASK_LOG);
@@ -666,6 +773,13 @@ void app_boot(void) {
     // detect pin, so a missing card is just a failed init, retried by log
     log_out.status = session_log_init();
 
+    // BSEC: the learned state off the card first, then the library - Bosch's
+    // order is config, state, outputs. no card means it starts from scratch
+    uint16_t air_len = 0;
+    boot.air_store = air_store_load(boot_air_state, &air_len);
+    boot.air_s = air_init(boot_air_state, air_len, VEHICLE_TEMP_OFFSET_C, &boot.air_restore);
+    boot.air_ver_ok = air_version(boot.air_ver);
+
     // starts the USART1 receive interrupt; last on purpose - the panel init
     // and the card mount above stall for longer than the ring would last
     boot.gps_s = gps_init();
@@ -673,6 +787,7 @@ void app_boot(void) {
     app_state_put_boot(&boot);
     session_log_get_stats(&log_out.stats);
     sd_spi_get_stats(&log_out.sd);
+    air_store_get_stats(&log_out.air_store);
     app_state_put_log(&log_out);
     console_report_init(&boot, log_out.status);
     boot_tick = HAL_GetTick();

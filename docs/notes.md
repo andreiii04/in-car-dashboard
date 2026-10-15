@@ -10,7 +10,8 @@ two words that come up a lot:
               1  i2c sensors         6  display
               2  bench calibration   7  sd card
               3  gps                 8  the main loop, 8b moved onto freertos
-              4  pitch and roll      9  BSEC, 10 tuning - not done yet
+              4  pitch and roll      9  air quality through BSEC
+                                     10 tuning - not done yet
   session   one power-on, one record in SESSIONS.JSON on the card
               5      19 sep         first drive, 18 min
               6-8    28 sep-3 oct   back on the bench with the fixes from 5
@@ -28,7 +29,7 @@ everything above keeps working. it also keeps each file small enough to read in
 one go.
 
 three files sit above all of it and are stacked on nothing - attitude.c, trip.c
-and elevation.c get handed plain numbers by main. nothing hardware-shaped goes
+and elevation.c get handed plain numbers by the imu task. nothing hardware-shaped goes
 in, so all three run on the mac.
 
 the usb console is the one stack that is mostly ST's:
@@ -234,7 +235,7 @@ second sensor on the same bus:
   temperature      degrees C
   pressure         Pascal from the driver, i turn it into hPa
   humidity         % relative humidity
-  gas resistance   ohms - not air quality yet, see below
+  gas resistance   ohms - BSEC turns it into air quality, see below
 
 env.c wraps it like imu.c wraps the LSM6DSO. called env for the role, not the
 part.
@@ -339,7 +340,7 @@ the resistance on its own does not mean much. it moves with humidity, with
 temperature, and with the age of the sensor. IAQ, eCO2 and VOC need BSEC, a
 closed binary library from Bosch.
 
-that is its own job, and a bigger one than i first thought:
+that was its own job, and a bigger one than i first thought:
 
 - not in the repo. needs a licence click-through, and the right prebuilt version
   for this exact chip and compiler
@@ -353,8 +354,8 @@ that is its own job, and a bigger one than i first thought:
   saved to the SD card and reloaded on the next boot. without that every drive
   starts from scratch and the number never becomes useful
 
-the last two are why BSEC cannot happen before main() exists - it needs the task
-loop and the card first.
+the last two are why BSEC waited for freertos and the card. it is done now,
+step 9 - see "air quality, step 9" further down.
 
 
 ## the GPS is a different kind of device
@@ -1341,7 +1342,8 @@ and T and RH are consistent with each other.
 not calibrating the offset yet though. at 1 Hz the heater runs 10% of the time;
 BSEC's low-power mode measures every 3 s, about 3.3% duty and a third of the
 heat. measuring an offset now would calibrate it against a duty cycle i am not
-going to ship. that belongs with BSEC.
+going to ship. that belongs with BSEC. (done in step 9: 4 C, from a balcony
+check, see vehicle_info.md.)
 
 the gas resistance climbs the whole time a session runs - 16 kohm at eight
 seconds, 27 kohm at a minute, plateauing near 51-57 kohm. the metal oxide layer
@@ -2156,7 +2158,7 @@ the file is one JSON object:
   ...
 
 every block is a fixed 2048 bytes, four sectors, and the object inside uses
-about 1750 of them. the last 16 bytes of a block are the separator: a comma
+about 1880 of them. the last 16 bytes of a block are the separator: a comma
 if another block follows, or the closing ] } if it is the last one.
 
 the fixed size is the whole safety story, same as before:
@@ -2208,8 +2210,8 @@ samples, the slowest record write, and the date the GPS sent if a fix ever
 came with a date the year check threw out.
 
 dropped console characters came out on 19 sep - in the car it is always the
-boot printout, 566, and the block was full. worst case is now 2023 of 2032
-bytes, so the next field means taking one out.
+boot printout, 566, and the block was full. worst case is now 2025 of 2032
+bytes (the air quality averages took 2), so the next field means taking one out.
 
 the point is that the console shouts all of this once a second at a terminal
 that is not attached when the board is in the car. the card keeps it with the
@@ -2282,7 +2284,7 @@ env_read used to sit in a busy wait for 143 ms. now env_start kicks the
 measurement off and says how long it takes, and env_read is called after
 that; called early, the driver says no new data and the loop tries again next
 pass. same sensor, same settings, nothing blocks. it is also the shape BSEC
-wants later - it says when to trigger and when to read.
+wanted - it says when to trigger and when to read - and it slotted straight in.
 
 
 ## the console is its own file
@@ -2495,7 +2497,7 @@ board if that happens.
 
 the console prints how much of each stack was never touched, the high-water
 mark. first run env had 236 bytes left of 1024, so it went to 1.5 KB. the
-rest had 300+ spare.
+rest had 300+ spare. BSEC made env bigger: ~1.3 KB used, so 2.5 KB now.
 
 stacks and queues come out of a 40 KB rtos heap. lowest it got was 18 KB
 free, during boot - boot's 4 KB stack goes back when it deletes itself. room
@@ -2560,16 +2562,151 @@ two odd things, both harmless:
   wait a second between unplug and plug
 
 
+## air quality, step 9
+
+the gas sensor is a hot metal-oxide layer. solvents, alcohol and breath make it
+conduct better, so the resistance drops. raw ohms mean little on their own -
+they also move with temperature, humidity and age.
+
+BSEC is bosch's closed library that turns it into numbers:
+
+  IAQ          0-500, where the air sits between the cleanest and worst this
+               sensor has seen. relative to its own history, not a unit
+  eCO2         what CO2 level would give this reading. worked out from the
+               VOCs, not measured
+  breath VOC   same idea, in ppm of breath
+  temp, RH     with the board's own heat taken off
+
+the datasheet has colours for IAQ (p9): up to 50 excellent, 100 good, 150
+lightly polluted, 200 moderate, 250 heavy, 350 severe, above that extreme. the
+panel colours the number the same way.
+
+
+## accuracy, 0 to 3
+
+every IAQ comes with an accuracy:
+
+  0   warming up - the 50 / 500 / 0.50 it shows are starting values, not air
+  1   rough idea
+  2   getting there
+  3   calibrated
+
+bosch says about 30 min in clean air and 30 min in bad air to get to 3. on the
+bench it hit 1 after ~7 min. 3 takes hours.
+
+panel: grey at 0, coloured from 1, IAQ 1/3 next to it until 3. the record only
+averages samples at 3, so a number in the file means it was trustworthy; never
+got there means null.
+
+
+## keeping what it learned
+
+everything BSEC learned is 180 bytes of ram, gone at ignition-off. without
+saving it every drive starts at 0 and never gets to 3.
+
+so every 10 min the env task asks BSEC for it and hands it to the log task,
+the only one allowed on the card. it goes into BSEC.BIN, and at boot it is
+read back before BSEC starts. loaded and restored on two power cycles.
+
+one rule: only a card that was there at boot gets saved to. a card pushed in
+mid-drive might hold a good state this boot never loaded, and a fresh one
+written over it would throw days of learning away.
+
+
+## two slots and a crc
+
+a power cut can land halfway through a write. so BSEC.BIN has two 512 byte
+slots and every save goes into the older one. cut mid-save and the other slot
+still has the last good state.
+
+each slot has a sequence number, so boot knows which is newer, and a CRC - a
+checksum over the contents - so a half-written slot gets spotted and skipped.
+the file is made full size at boot, so the FAT is only touched parked. the slot
+code has no hardware in it, 30 checks on the mac, torn writes included.
+
+
+## bsec runs the sensor, not me
+
+before every measurement BSEC says: measure or not, how much oversampling, how
+hot and how long to heat, and when to call it next. it picked 2x / 16x / 1x,
+the same as my old fixed set, and 320 C for 197 ms. after a restart it runs
+380 C for a second for a while - bosch's power-on conditioning.
+
+a call more than 6.25% late, 187 ms at 3 s, gets a warning. the console counts
+those as late. 0 so far.
+
+its clock is nanoseconds in 64 bits. HAL_GetTick is 32 bit ms and wraps at 49
+days, so the env task adds up tick differences into a 64 bit count.
+
+the i2c bus is only held while talking to the sensor. BSEC's maths runs with
+the bus free, so the IMU never waits on it.
+
+
+## the pressure bug
+
+first flash: pressure 673 hPa, should be ~1012. BSEC only has the sensor
+measure what the outputs i asked for need. i asked for IAQ, temperature and
+humidity, not pressure, so it told the sensor to skip it. a skipped measurement
+leaves a placeholder, 0x80000, in the register (datasheet p21), and the driver
+turned that into a believable 673.
+
+fix: ask for raw pressure too, even though i never read BSEC's copy. a library
+that runs the hardware does exactly what you ask - ask for everything you read.
+
+
+## the temperature offset
+
+the sensor sits in its own warm pocket - heater, MCU, LDO, panel - and reads
+about 4 C high. humidity is measured against that warmer air, so it reads low.
+BSEC takes the 4 C off and works the humidity out again for the real
+temperature, so both come out right. the 4 is from one balcony check, recheck
+in the closed case.
+
+
+## the library is optional
+
+bosch's licence does not let me publish BSEC, so it is gitignored. CMake looks
+for the library file - there, it gets linked; not there, air.c builds a
+stand-in with the old fixed settings and raw readings. a clone always builds.
+
+gotcha: the linker reads libraries left to right and never looks back. the
+maths library came before BSEC on the link line, so BSEC's expf and friends
+were missing. linking m again after it fixed it.
+
+
+## the screen, third pass
+
+gas came off the right column, IAQ went on. nothing closer than 8 px to either
+side edge now, and the right column is one right edge, labels and values.
+PRESS lost its hPa - right-aligned it touched the gauge's right number.
+
+
+## bsec numbers
+
+15 oct, bench, indoors, no fix.
+
+  pressure       1011.8 hPa (673 before the fix)
+  oversampling   2x / 16x / 1x, heater 320 C 197 ms
+  temp, RH       24.5 C / 37.6 % against raw 28.6 C / 29.5 %
+  accuracy       1 after ~7 min
+  state          first save at 10 min, restored on two power cycles
+  timing         int1 105/105, dtmax 10 ms, late 0
+  stack          env uses ~1.3 KB of 2.5 KB
+  flash          79.9 %, ~25 KB of it BSEC
+
+still to see: accuracy 3, a boot with no card, temperature against a
+reference in the closed case.
+
+
 ## left for later
 
 INT1 is done - the loop is paced by the sensor now, 105 edges a second and no
 sample missed. the decimation and the aliasing from the ODR section are gone.
 
-the BME680 module is done for temperature, pressure, humidity and raw gas
-resistance. the air quality numbers still need BSEC.
+the BME680 is done - temperature, pressure, humidity, and air quality through
+BSEC (step 9). accuracy 3 is still to be seen.
 
-the display, the SD card and the main loop are done on the board. BSEC is
-still untouched.
+the display, the SD card and the main loop are done on the board.
 
 bring-up so far: TIM2 blinking an LED proved power, flashing, the 168 MHz clock
 tree and the timers. then the usb console - the mac sees a serial port, printf
@@ -2584,11 +2721,13 @@ zero missed. then steps 6 to 8, written blind against the datasheets and all
 three passed in one session - the panel, the card, and the whole loop running
 together for eight minutes with nothing missed.
 
-freertos is done (8b) - the card write no longer costs IMU samples.
+freertos is done (8b) - the card write no longer costs IMU samples. BSEC is
+done (9) - IAQ on the panel, averages in the record, its state on the card.
 
-next: a new ml2032 (or D3 out and a CR2032), a drive with references (trip meter, speedo, a
-roundabout, a signed grade, known altitudes), then BSEC, tuning, the
-top case. and the gps needs open sky: time to first fix, altitude, and whether
+next: VEHICLE_UTC_OFFSET_MIN to 120 for winter, a short drive on the car set,
+a per-second drive log so a drive can be replayed on the mac for tuning, a
+new ml2032 (or D3 out and a CR2032), a drive with references (trip meter,
+speedo, a roundabout, a signed grade, known altitudes), the top case. and the gps needs open sky: time to first fix, altitude, and whether
 the 3 s clock offset and the age walk survive a proper fix.
 
 the lateral fix is flashed - every sample now, not once a second. the car rest

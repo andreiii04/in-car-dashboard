@@ -39,6 +39,37 @@ static const char *env_status_str(env_status_t s) {
     }
 }
 
+static const char *air_status_str(air_status_t s) {
+    switch (s) {
+    case AIR_OK:            return "OK";
+    case AIR_NO_LIB:        return "no BSEC in this build - raw gas only";
+    case AIR_ERR_INIT:      return "ERR_INIT - bsec_init failed";
+    case AIR_ERR_CONFIG:    return "ERR_CONFIG - config blob refused";
+    case AIR_ERR_SUBSCRIBE: return "ERR_SUBSCRIBE - output list refused";
+    default:                return "unknown";
+    }
+}
+
+static const char *air_restore_str(air_restore_t r) {
+    switch (r) {
+    case AIR_STATE_FRESH:    return "fresh";
+    case AIR_STATE_RESTORED: return "restored";
+    case AIR_STATE_REFUSED:  return "REFUSED by BSEC - fresh";
+    default:                 return "unknown";
+    }
+}
+
+static const char *air_store_str(air_store_boot_t b) {
+    switch (b) {
+    case AIR_STORE_NO_CARD: return "no card - no saves this drive";
+    case AIR_STORE_NEW:     return "new file";
+    case AIR_STORE_EMPTY:   return "no good slot";
+    case AIR_STORE_LOADED:  return "loaded";
+    case AIR_STORE_ERR:     return "ERROR - no saves this drive";
+    default:                return "unknown";
+    }
+}
+
 static const char *gps_status_str(gps_status_t s) {
     switch (s) {
     case GPS_OK:       return "OK";
@@ -109,6 +140,11 @@ void console_report_init(const app_boot_t *b, log_status_t log_s) {
         printf("attitude: mount vector too short, staying level\n");
     }
     printf("env_init: %s\n", env_status_str(b->env_s));
+    printf("air_init: %s", air_status_str(b->air_s));
+    if (b->air_ver_ok) {
+        printf("  bsec %u.%u.%u.%u", b->air_ver[0], b->air_ver[1], b->air_ver[2], b->air_ver[3]);
+    }
+    printf("  BSEC.BIN %s  state %s\n", air_store_str(b->air_store), air_restore_str(b->air_restore));
     printf("gps_init: %s\n", gps_status_str(b->gps_s));
 
     // the ID gate, raw and decoded; either decode landing on 009341 passes,
@@ -261,11 +297,39 @@ void console_report(const app_state_t *s, const app_rtos_t *r) {
 
     if (b->env_s == ENV_OK) {
         if (s->env.have) {
-            printf("env   %.2f C   %.2f hPa   %.2f %%RH   gas %.0f ohm %s  err %lu  qdrop %lu\n",
-                s->env.sample.temperature_c, s->env.sample.pressure_hpa,
-                s->env.sample.humidity_pct, s->env.sample.gas_resistance_ohm,
+            // raw is the sensor's own warm pocket, comp has the offset taken
+            // off - the panel and the record show comp. os is the
+            // oversampling BSEC asked for, temperature/pressure/humidity, as
+            // the sensor's codes: 0 skipped, 1 1x, 2 2x, 3 4x, 4 8x, 5 16x
+            printf("env   raw %.2f C %.1f %%RH  comp %.2f C %.1f %%RH  %.2f hPa  gas %.0f ohm %s  err %lu  qdrop %lu  os %u/%u/%u  heat %u C %u ms\n",
+                s->env.sample.temperature_c, s->env.sample.humidity_pct,
+                s->env.air.temperature_c, s->env.air.humidity_pct,
+                s->env.sample.pressure_hpa, s->env.sample.gas_resistance_ohm,
                 s->env.sample.gas_valid ? "(valid)" : "(heater warming)",
-                (unsigned long)s->env.errors, (unsigned long)s->env.dropped);
+                (unsigned long)s->env.errors, (unsigned long)s->env.dropped,
+                s->env.set.os_temp, s->env.set.os_pres, s->env.set.os_hum,
+                s->env.set.heater_temp_c, s->env.set.heater_ms);
+        }
+        if (b->air_s == AIR_OK) {
+            const air_sample_t *a = &s->env.air;
+            const air_store_stats_t *st = &s->log.air_store;
+            // accuracy 0 stabilising, 1 low, 2 medium, 3 calibrated; cal n
+            // is how many calibrated samples the drive averages have taken
+            printf("air   iaq %.0f acc %u  eco2 %.0f ppm  bvoc %.2f ppm  stab %c runin %c  cal n %lu  bsec %ld late %lu bad %lu  ",
+                a->iaq, a->iaq_accuracy, a->eco2_ppm, a->bvoc_ppm,
+                a->stabilised ? 'Y' : 'N', a->run_in ? 'Y' : 'N',
+                (unsigned long)s->imu.trip.air_n, (long)s->env.air_code,
+                (unsigned long)s->env.air_late, (unsigned long)s->env.air_bad);
+            if (!st->armed) {
+                printf("saves off\n");
+            } else if (st->last_save_tick == 0u) {
+                printf("saves %lu err %lu (first after 10 min)\n",
+                    (unsigned long)st->saves, (unsigned long)st->errors);
+            } else {
+                printf("saves %lu err %lu  last %lu min ago\n",
+                    (unsigned long)st->saves, (unsigned long)st->errors,
+                    (unsigned long)((HAL_GetTick() - st->last_save_tick) / 60000u));
+            }
         }
     } else {
         printf("env   init failed: %s\n", env_status_str(b->env_s));

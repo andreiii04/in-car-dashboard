@@ -163,6 +163,15 @@ static inline float vehicle_max_yaw_rate_dps(float speed_kmh) {
     return limit * VEHICLE_RAD_TO_DEG;
 }
 
+// ---- BME680 temperature offset --------------------------------------------------
+//
+// how much warmer the sensor runs than the air around the board - its own
+// heater, the MCU, the LDO and the panel. BSEC takes it off the temperature
+// and works the humidity out again, so both come out right. measured once,
+// 13 Oct 2026 on the balcony in the open tray: 18.0 C against 14 C outside,
+// with the dew points agreeing. recheck in the closed case
+#define VEHICLE_TEMP_OFFSET_C 4.0f
+
 // ---- local time ----------------------------------------------------------------
 //
 // the GPS gives UTC and the firmware keeps UTC everywhere; this offset is

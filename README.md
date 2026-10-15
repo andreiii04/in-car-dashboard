@@ -9,7 +9,8 @@ A standalone telemetry display for a car: a custom 4-layer STM32 board with a 2.
 **Live, on the screen**
 - A G-meter: a dot for the acceleration you feel, its magnitude, and the session's hardest braking, acceleration and cornering each way around the ring
 - Speed, session maximum and distance (GPS)
-- Temperature, humidity, pressure and gas resistance (BME680)
+- Temperature, humidity and pressure (BME680), with the board's own heat taken off the temperature
+- Air quality as an IAQ index (BME680 through Bosch's BSEC), coloured by the datasheet's air-quality bands, with BSEC's calibration progress next to it until it is done
 - Local time, time since power-up, satellites, position and altitude (GPS fused with the barometer)
 
 **Per drive, on the SD card** — one file, `SESSIONS.JSON`, a single valid JSON document with one fixed-size block per drive:
@@ -17,6 +18,7 @@ A standalone telemetry display for a car: a custom 4-layer STM32 board with a 2.
 - Hardest acceleration, braking and cornering, worst lateral load against the car's rollover limit
 - Peak pitch and roll and how close they came to the car's limits
 - Temperature, pressure and humidity min/max/average; climb and descent
+- Average IAQ, CO2 equivalent and breath-VOC equivalent, counting only the samples BSEC called calibrated
 - A `faults` section with every init result and error counter, so a drive that went wrong says so in its own record
 
 The record is rewritten in place every 10 s, because the car cuts power without warning. A cut can only ever damage the current drive's block, and the two writes that move the closing bracket are ordered so an interrupted one repairs itself on the next boot.
@@ -27,7 +29,7 @@ The record is rewritten in place every 10 s, because the car cuts power without 
 |---|---|---|
 | STMicroelectronics STM32F446RCT6 | Cortex-M4F MCU, 180 MHz, 256 KB flash, 128 KB RAM | — |
 | STMicroelectronics LSM6DSOTR | 6-axis accelerometer + gyroscope | I2C1, data-ready on INT1 |
-| Bosch Sensortec BME680 | Temperature, pressure, humidity, gas | I2C1 |
+| Bosch Sensortec BME680 | Temperature, pressure, humidity, gas; air quality through Bosch BSEC | I2C1 |
 | Quectel L76L-M33 | GPS + GLONASS receiver, 5 Hz NMEA (1 Hz fallback) | USART1, 115200 baud (boots at 9600) |
 | GPS ANT-1 chip antenna | Passive GNSS antenna | RF_IN |
 | KMRTM28028-SPI / MSP2807 | 2.8" 320×240 TFT, ILI9341 driver, full-size SD socket | SPI1 (display), SPI2 (SD) |
@@ -80,24 +82,24 @@ A boot task runs the whole init, then starts one task per job and ends. From hig
 - **watchdog** — reloads the hardware watchdog every 250 ms, but only while every other task keeps checking in on time
 - **IMU** — woken by the IMU's own data-ready interrupt at about 105 Hz; each sample is mapped from sensor axes to vehicle axes (ISO 8855: X forward, Y left, Z up), run through the attitude filter, then handed to the trip statistics. It is the only task that touches the filter, the statistics and the altitude; GPS fixes and BME680 samples reach it through queues
 - **GPS** — drains the UART ring buffer every 10 ms and parses NMEA sentences
-- **environment** — triggers the BME680 every 3 s and sleeps while it measures
+- **environment** — runs the BME680 at the times and heater settings Bosch's BSEC asks for (every 3 s), sleeps while it measures, and hands BSEC's learned state to the logger every 10 minutes
 - **display** — redraws at 20 Hz, band by band, with no framebuffer
 - **console** — the once-a-second status block over USB
-- **logger** — rewrites the session record on the SD card every 10 s
+- **logger** — rewrites the session record on the SD card every 10 s, and saves BSEC's state
 
 Each task publishes what it knows into one shared snapshot behind a mutex, and the display, console and logger read copies of it. A card write can take up to 250 ms; with the logger at the bottom, it no longer delays a single IMU sample.
 
 | Stack | Modules |
 |---|---|
-| Sensors | `i2c_bus` → vendor drivers (ST `lsm6dso`, Bosch `BME68x`) → platform glue → `imu`, `env` |
+| Sensors | `i2c_bus` → vendor drivers (ST `lsm6dso`, Bosch `BME68x`) → platform glue → `imu`, `env`; `air` (Bosch BSEC: IAQ, eCO2, breath VOC, heat-compensated temperature and humidity) |
 | GPS | `uart_bus` (interrupt-driven ring buffer, baud switched at runtime) → `nmea` (parser and PMTK command builder) → `gps` |
 | Fusion and statistics | `attitude` (complementary filter, full Euler kinematics, mount rotation), `trip` (distance, peaks, lean, rollover margins, GPS-dropout coasting), `elevation` (GPS altitude fused with barometric pressure) |
 | Display | `lcd` (ILI9341 over SPI) → `gfx` (band renderer, dirty rectangles) → `screen` |
-| Storage | `sd_spi` (SD SPI mode, CRC on every command and block) → FatFs → `session_record` → `session_log` |
+| Storage | `sd_spi` (SD SPI mode, CRC on every command and block) → FatFs → `session_record` → `session_log`; `air_slot` → `air_store` (BSEC's learned state in `BSEC.BIN`, two CRC-checked slots written in turn) |
 | Console | `usb_serial` (printf over USB CDC) → `console` |
 | RTOS | `app_tasks` (boot sequence and task loops), `app_state` (shared snapshot, queues, I2C mutex), `watchdog` (per-task check-ins) |
 
-Everything with no hardware in it is host-testable and tested on a PC, 257 checks across seven modules: `nmea`, `attitude`, `trip`, `elevation`, `gfx`, `sd_crc`, `session_record`. Expected values come from independent derivations rather than restatements of the code under test. Car- and mount-specific constants (axis map, calibration, wheelbase, track, centre-of-gravity height) live in one header, `firmware/App/fusion/vehicle_axes.h`, explained in [`docs/vehicle_info.md`](docs/vehicle_info.md).
+Everything with no hardware in it is host-testable and tested on a PC, 300 checks across eight modules: `nmea`, `attitude`, `trip`, `elevation`, `gfx`, `sd_crc`, `session_record`, `air_slot`. Expected values come from independent derivations rather than restatements of the code under test. Car- and mount-specific constants (axis map, calibration, wheelbase, track, centre-of-gravity height) live in one header, `firmware/App/fusion/vehicle_axes.h`, explained in [`docs/vehicle_info.md`](docs/vehicle_info.md).
 
 Some decisions worth knowing before changing anything:
 - **Pitch and roll come from accelerometer and gyroscope fused.** The car's own acceleration is subtracted first, using GPS speed and speed × yaw rate, so braking and cornering don't read as tilt.
@@ -119,7 +121,7 @@ firmware/            STM32 firmware (CMake, CubeMX project dashboard_firmware.io
     storage/         SD card over SPI, session record and log
     console/         USB serial console
     rtos/            FreeRTOS tasks, shared state, watchdog
-    drivers/         vendor sensor drivers (ST, Bosch), unmodified
+    drivers/         vendor sensor drivers (ST, Bosch), unmodified; BSEC goes in drivers/bsec/
     fonts/           generated bitmap fonts
   Core/ Drivers/ FATFS/ Middlewares/ USB_DEVICE/   CubeMX- and ST-generated
   tests/             host tests, each file carries its own compile line
@@ -142,7 +144,9 @@ cmake --preset Debug
 cmake --build build/Debug
 ```
 
-The output is `build/Debug/dashboard_firmware.elf`. Flash it over SWD with an ST-Link: from an IDE (CLion with the STM32 plugin, or STM32CubeIDE), or with STM32CubeProgrammer. The serial console is the USB-C port itself, at `/dev/cu.usbmodem*` on macOS; the baud rate is ignored.
+The output is `build/Debug/dashboard_firmware.elf`.
+
+**Air quality needs Bosch's BSEC2 library, which is not in this repository** (it is closed source under Bosch's licence). Without it the firmware still builds and runs: the BME680 gives raw temperature, humidity, pressure and gas resistance, and the IAQ field stays empty. To add it, download **BSEC2 2.6.1.0** from Bosch Sensortec's BSEC page (a licence click-through), unzip it and copy the whole package to `firmware/App/drivers/bsec/`, so that `firmware/App/drivers/bsec/algo/bsec_IAQ/bin/gcc/Cortex_M4F/libalgobsec.a` exists. CMake finds it on the next configure (`BSEC found - air quality on`) and links the Cortex-M4F hard-float build with the `bme680_iaq_33v_3s_4d` config. The folder is in `.gitignore`. Flash it over SWD with an ST-Link: from an IDE (CLion with the STM32 plugin, or STM32CubeIDE), or with STM32CubeProgrammer. The serial console is the USB-C port itself, at `/dev/cu.usbmodem*` on macOS; the baud rate is ignored.
 
 Host tests build with any C11 compiler. For example:
 
@@ -177,10 +181,9 @@ Not included in the repository; all are available from the manufacturers:
 
 ## Status
 
-Working on the bench and in the car. Bring-up is complete: console, sensors, calibration, GPS, attitude, interrupt-paced sampling, display, SD logging, the main loop, and its move onto FreeRTOS. The first long drive, 118.5 km, matched the route distance and ran with every fault counter at zero.
+Working on the bench and in the car. Bring-up is complete: console, sensors, calibration, GPS, attitude, interrupt-paced sampling, display, SD logging, the main loop, its move onto FreeRTOS, and air quality through Bosch's BSEC. The first long drive, 118.5 km, matched the route distance and ran with every fault counter at zero.
 
 Still to do:
-- Air-quality index through Bosch's BSEC library, which is closed source and won't be in this repository
 - Tuning the filters against logged drives
 - Printing and fitting the lid
 - A second screen for pitch and roll off-road

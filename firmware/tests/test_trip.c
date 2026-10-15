@@ -313,6 +313,23 @@ int main(void) {
     check("pressure average", near(t.press_avg_hpa, 1005.0f, 0.01f));
     check("humidity average", near(t.hum_avg_pct, 50.0f, 0.01f));
 
+    printf("air quality, calibrated samples only\n");
+    trip_init();
+    trip_update_air(400.0f, 5000.0f, 50.0f, 2);   // still learning - not kept
+    trip_get(&t);
+    check("accuracy 2 is not counted", t.air_n == 0u);
+    trip_update_air(40.0f, 600.0f, 0.5f, 3);
+    trip_update_air(60.0f, 800.0f, 1.5f, 3);
+    trip_update_air(300.0f, 3000.0f, 20.0f, 1);   // dropped back - not kept
+    trip_get(&t);
+    check("two calibrated samples counted", t.air_n == 2u);
+    check("iaq average of the calibrated ones", near(t.iaq_avg, 50.0f, 0.01f));
+    check("eco2 average of the calibrated ones", near(t.eco2_avg_ppm, 700.0f, 0.01f));
+    check("bvoc average of the calibrated ones", near(t.bvoc_avg_ppm, 1.0f, 0.001f));
+    trip_init();
+    trip_get(&t);
+    check("a new session starts the air over", t.air_n == 0u && near(t.iaq_avg, 0.0f, 1e-6f));
+
     printf("\n%s\n", fails ? "SOME CHECKS FAILED" : "all checks passed");
     return fails != 0;
 }

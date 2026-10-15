@@ -50,6 +50,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     App/sensors/bme68x_platform.c
     App/sensors/imu.c
     App/sensors/env.c
+    App/sensors/air.c
     App/gps/uart_bus.c
     App/gps/nmea.c
     App/gps/gps.c
@@ -64,6 +65,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     App/storage/sd_spi.c
     App/storage/session_record.c
     App/storage/session_log.c
+    App/storage/air_slot.c
+    App/storage/air_store.c
     App/console/console.c
     App/sensors/bench_cal.c
     App/rtos/app_state.c
@@ -98,6 +101,24 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
 )
+
+# Bosch BSEC2 for the air quality numbers - closed source, not in the repo
+# (the README says where to get it). linked only if it is there; without it
+# air.c builds as a stand-in and the BME680 gives raw readings, as before
+set(BSEC_DIR ${CMAKE_SOURCE_DIR}/App/drivers/bsec/algo/bsec_IAQ)
+set(BSEC_CONFIG_DIR ${BSEC_DIR}/config/bme680/bme680_iaq_33v_3s_4d)
+if(EXISTS ${BSEC_DIR}/bin/gcc/Cortex_M4F/libalgobsec.a)
+    message(STATUS "BSEC found - air quality on")
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${BSEC_CONFIG_DIR}/bsec_iaq.c)
+    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${BSEC_DIR}/inc ${BSEC_CONFIG_DIR})
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_BSEC=1)
+    # m again after it - the library calls expf, log10f and friends, and the
+    # linker only looks backwards for them
+    target_link_libraries(${CMAKE_PROJECT_NAME} ${BSEC_DIR}/bin/gcc/Cortex_M4F/libalgobsec.a m)
+else()
+    message(STATUS "BSEC not found - raw BME680 readings only")
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_BSEC=0)
+endif()
 
 # newlib-nano leaves float formatting out of printf unless it is pulled in
 target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -u _printf_float)

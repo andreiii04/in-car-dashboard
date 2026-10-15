@@ -57,6 +57,11 @@ typedef struct {
     float    press_min_hpa, press_max_hpa, press_avg_hpa;
     float    hum_min_pct, hum_max_pct, hum_avg_pct;
 
+    // air quality averages, from samples BSEC called calibrated only;
+    // air_n 0 means it never got there this drive
+    uint32_t air_n;
+    float    iaq_avg, eco2_avg_ppm, bvoc_avg_ppm;
+
     // true while the GPS is missing and the speed is being guessed from the
     // accelerometer instead; the numbers are still usable, just less certain
     bool     coasting;
@@ -83,6 +88,10 @@ void trip_update_gps(const gps_fix_t *fix);
 
 // one BME680 sample, roughly every 3 seconds
 void trip_update_env(float temp_c, float press_hpa, float hum_pct);
+
+// one BSEC output, same rate; only counted at accuracy 3 - below that BSEC is
+// still learning what clean air looks like here
+void trip_update_air(float iaq, float eco2_ppm, float bvoc_ppm, uint8_t accuracy);
 
 // copy out everything
 void trip_get(trip_stats_t *out);

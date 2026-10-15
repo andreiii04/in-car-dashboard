@@ -61,6 +61,10 @@
 // fixes kept for that; 5 Hz needs 6 to look back a whole second, 8 leaves room
 #define TRIP_ACCEL_RING 8
 
+// BSEC's IAQ accuracy that counts towards the drive averages - 3 is
+// calibrated; a number in the record should mean it can be trusted
+#define TRIP_AIR_ACCURACY 3u
+
 #define TRIP_G_TO_MPS2 9.80665f
 #define TRIP_DEG_TO_RAD 0.017453293f
 #define TRIP_TWO_PI 6.283185307f
@@ -387,6 +391,18 @@ void trip_update_env(float temp_c, float press_hpa, float hum_pct) {
     trip_mean(&stats.temp_avg_c, &temp_n, temp_c);
     trip_mean(&stats.press_avg_hpa, &press_n, press_hpa);
     trip_mean(&stats.hum_avg_pct, &hum_n, hum_pct);
+}
+
+void trip_update_air(float iaq, float eco2_ppm, float bvoc_ppm, uint8_t accuracy) {
+    if (accuracy < TRIP_AIR_ACCURACY) {
+        return;
+    }
+    // one count for all three, so they always average the same samples
+    stats.air_n++;
+    float n = (float)stats.air_n;
+    stats.iaq_avg += (iaq - stats.iaq_avg) / n;
+    stats.eco2_avg_ppm += (eco2_ppm - stats.eco2_avg_ppm) / n;
+    stats.bvoc_avg_ppm += (bvoc_ppm - stats.bvoc_avg_ppm) / n;
 }
 
 void trip_get(trip_stats_t *out) {

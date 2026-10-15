@@ -27,13 +27,14 @@
 #define SCR_DOT_R       7
 #define SCR_DOT_MAX     (SCR_R_DISC - SCR_DOT_R - 1)
 
+#define SCR_EDGE        8      // no text closer than this to the left or right edge
 #define SCR_TOP_H       32
 #define SCR_BOTTOM_Y    200
 #define SCR_COL_W       76
 #define SCR_LCOL_X      58     // left values end here - the ring's side numbers
                                // start at 68 and one row is level with them
-#define SCR_SPEED_X     70     // the speed ends further right: "100" is 3 x 22 px
-                               // in the large font, so it starts at x 4; the ring
+#define SCR_SPEED_X     74     // the speed ends further right: "100" is 3 x 22 px
+                               // in the large font, so it starts at x 8; the ring
                                // comes no closer than x 86 in that row
 #define SCR_ROW_Y0      36     // right column, four rows
 #define SCR_ROW_H       43
@@ -57,6 +58,16 @@
 #define SCR_DIM     GFX_RGB(90, 90, 90)
 #define SCR_LINE    GFX_RGB(30, 30, 30)
 
+// the IAQ bands and their colours, from the BME680 datasheet Table 4 (p9);
+// the last two lightened a little so they still read on black
+#define SCR_IAQ_EXCELLENT GFX_RGB(0, 230, 0)       // 0-50
+#define SCR_IAQ_GOOD      GFX_RGB(146, 208, 80)    // 51-100
+#define SCR_IAQ_LIGHT     GFX_RGB(255, 255, 0)     // 101-150, lightly polluted
+#define SCR_IAQ_MODERATE  GFX_RGB(255, 128, 0)     // 151-200
+#define SCR_IAQ_HEAVY     GFX_RGB(255, 0, 0)       // 201-250
+#define SCR_IAQ_SEVERE    GFX_RGB(200, 0, 110)     // 251-350
+#define SCR_IAQ_EXTREME   GFX_RGB(170, 90, 30)     // above 350
+
 // ---- text elements -------------------------------------------------------------
 
 typedef enum {
@@ -71,6 +82,7 @@ typedef enum {
     EL_CENTRE,
     EL_L0, EL_L1, EL_L2,
     EL_R0, EL_R1, EL_R2, EL_R3,
+    EL_R3_LABEL,       // "IAQ", with the accuracy until BSEC is calibrated
     EL_BOT_SATS,
     EL_BOT_POS,
     EL_BOT_ALT,
@@ -90,7 +102,9 @@ typedef struct {
 static screen_el_t els[EL_COUNT];
 
 static const char *left_labels[3]  = { "SPEED km/h", "MAX km/h", "DIST km" };
-static const char *right_labels[4] = { "TEMP C", "HUMID %", "PRESS hPa", "GAS kohm" };
+// PRESS has no unit: right-aligned, "PRESS hPa" touched the gauge's right
+// peak number, and 1013 reads as hPa anyway
+static const char *right_labels[3] = { "TEMP C", "HUMID %", "PRESS" };
 
 typedef enum {
     MODE_MAIN = 0,
@@ -143,10 +157,10 @@ static void el_paint(const screen_el_t *e) {
 
 static void screen_layout(void) {
     // top strip: the wall clock on the left, time since power-up in the middle
-    el_setup(EL_CLOCK, &font_medium, 4, 7, GFX_ALIGN_LEFT, 96, SCR_VALUE);
+    el_setup(EL_CLOCK, &font_medium, SCR_EDGE, 7, GFX_ALIGN_LEFT, 96, SCR_VALUE);
     el_setup(EL_DURATION, &font_medium, SCR_CX, 7, GFX_ALIGN_CENTER, 110, SCR_VALUE);
-    el_setup(EL_SD, &font_small, 316, 10, GFX_ALIGN_RIGHT, 24, SCR_DIM);
-    el_setup(EL_GPS, &font_small, 286, 10, GFX_ALIGN_RIGHT, 30, SCR_DIM);
+    el_setup(EL_SD, &font_small, (int16_t)(GFX_W - SCR_EDGE), 10, GFX_ALIGN_RIGHT, 24, SCR_DIM);
+    el_setup(EL_GPS, &font_small, (int16_t)(GFX_W - SCR_EDGE - 30), 10, GFX_ALIGN_RIGHT, 30, SCR_DIM);
 
     // the four peaks, on the ring
     int16_t half = (int16_t)(font_medium.height / 2);
@@ -167,25 +181,29 @@ static void screen_layout(void) {
 
     // left column: speed is the headline number, so it gets the large font
     el_setup(EL_L0, &font_large, SCR_SPEED_X,
-             (int16_t)(SCR_LROW_Y0 + SCR_LVALUE_DY), GFX_ALIGN_RIGHT, SCR_SPEED_X - 4, SCR_VALUE);
+             (int16_t)(SCR_LROW_Y0 + SCR_LVALUE_DY), GFX_ALIGN_RIGHT, SCR_SPEED_X - SCR_EDGE, SCR_VALUE);
     for (int i = 1; i < 3; i++) {
         int16_t y = (int16_t)(SCR_LROW_Y0 + i * SCR_LROW_H + SCR_VALUE_DY);
         el_setup((screen_el_id_t)(EL_L0 + i), &font_medium, SCR_LCOL_X, y,
-                 GFX_ALIGN_RIGHT, SCR_LCOL_X - 4, SCR_VALUE);
+                 GFX_ALIGN_RIGHT, SCR_LCOL_X - SCR_EDGE, SCR_VALUE);
     }
 
-    // right column, four rows, values right-aligned under their labels
+    // right column, four rows, labels and values on one right edge
     for (int i = 0; i < 4; i++) {
         int16_t y = (int16_t)(SCR_ROW_Y0 + i * SCR_ROW_H + SCR_VALUE_DY);
-        el_setup((screen_el_id_t)(EL_R0 + i), &font_medium, (int16_t)(GFX_W - 4), y,
-                 GFX_ALIGN_RIGHT, SCR_COL_W - 6, SCR_VALUE);
+        el_setup((screen_el_id_t)(EL_R0 + i), &font_medium, (int16_t)(GFX_W - SCR_EDGE), y,
+                 GFX_ALIGN_RIGHT, SCR_COL_W - SCR_EDGE, SCR_VALUE);
     }
+    // the IAQ label changes with the accuracy, so it is an element too
+    el_setup(EL_R3_LABEL, &font_small, (int16_t)(GFX_W - SCR_EDGE),
+             (int16_t)(SCR_ROW_Y0 + 3 * SCR_ROW_H + SCR_LABEL_DY),
+             GFX_ALIGN_RIGHT, SCR_COL_W - SCR_EDGE, SCR_LABEL);
 
     // bottom strip: satellites then position down the left, altitude on its
     // own on the right in a bigger font - it is the number worth reading
-    el_setup(EL_BOT_SATS, &font_small, 4, (int16_t)(SCR_BOTTOM_Y + 4), GFX_ALIGN_LEFT, 200, SCR_LABEL);
-    el_setup(EL_BOT_POS, &font_small, 4, (int16_t)(SCR_BOTTOM_Y + 22), GFX_ALIGN_LEFT, 200, SCR_VALUE);
-    el_setup(EL_BOT_ALT, &font_medium, (int16_t)(GFX_W - 4), (int16_t)(SCR_BOTTOM_Y + 10),
+    el_setup(EL_BOT_SATS, &font_small, SCR_EDGE, (int16_t)(SCR_BOTTOM_Y + 4), GFX_ALIGN_LEFT, 196, SCR_LABEL);
+    el_setup(EL_BOT_POS, &font_small, SCR_EDGE, (int16_t)(SCR_BOTTOM_Y + 22), GFX_ALIGN_LEFT, 196, SCR_VALUE);
+    el_setup(EL_BOT_ALT, &font_medium, (int16_t)(GFX_W - SCR_EDGE), (int16_t)(SCR_BOTTOM_Y + 10),
              GFX_ALIGN_RIGHT, 116, SCR_VALUE);
 }
 
@@ -253,6 +271,29 @@ static void screen_update_dot(const screen_data_t *d) {
                    2 * SCR_DOT_R + 3, 2 * SCR_DOT_R + 3);
 }
 
+// which band of the datasheet's table an IAQ falls in
+static gfx_color_t iaq_color(float iaq) {
+    if (iaq <= 50.0f) {
+        return SCR_IAQ_EXCELLENT;
+    }
+    if (iaq <= 100.0f) {
+        return SCR_IAQ_GOOD;
+    }
+    if (iaq <= 150.0f) {
+        return SCR_IAQ_LIGHT;
+    }
+    if (iaq <= 200.0f) {
+        return SCR_IAQ_MODERATE;
+    }
+    if (iaq <= 250.0f) {
+        return SCR_IAQ_HEAVY;
+    }
+    if (iaq <= 350.0f) {
+        return SCR_IAQ_SEVERE;
+    }
+    return SCR_IAQ_EXTREME;
+}
+
 void screen_update(const screen_data_t *d) {
     char buf[40];
 
@@ -317,11 +358,20 @@ void screen_update(const screen_data_t *d) {
         el_set(EL_R1, SCR_DIM, "--");
         el_set(EL_R2, SCR_DIM, "--");
     }
-    if (d->env_valid && d->gas_valid) {
-        snprintf(buf, sizeof(buf), "%.0f", (double)d->gas_kohm);
-        el_set(EL_R3, SCR_VALUE, buf);
+    // the IAQ in its band's colour; grey at accuracy 0, where BSEC's 50 is
+    // only a starting value. the label carries the accuracy until it is 3
+    if (d->env_valid && d->iaq_valid) {
+        snprintf(buf, sizeof(buf), "%.0f", (double)d->iaq);
+        el_set(EL_R3, (d->iaq_accuracy == 0u) ? SCR_DIM : iaq_color(d->iaq), buf);
+        if (d->iaq_accuracy < 3u) {
+            snprintf(buf, sizeof(buf), "IAQ %u/3", (unsigned)d->iaq_accuracy);
+            el_set(EL_R3_LABEL, SCR_LABEL, buf);
+        } else {
+            el_set(EL_R3_LABEL, SCR_LABEL, "IAQ");
+        }
     } else {
         el_set(EL_R3, SCR_DIM, "--");
+        el_set(EL_R3_LABEL, SCR_LABEL, "IAQ");
     }
 
     // bottom: how many satellites, where it thinks it is, and the altitude on
@@ -385,15 +435,18 @@ static void paint_main(void) {
     // column labels are fixed text, so they are not elements
     for (int i = 0; i < 3; i++) {
         int16_t y = (int16_t)(SCR_LROW_Y0 + i * SCR_LROW_H + SCR_LABEL_DY);
-        gfx_draw_text(&font_small, 4, y, GFX_ALIGN_LEFT, left_labels[i], SCR_LABEL);
+        gfx_draw_text(&font_small, SCR_EDGE, y, GFX_ALIGN_LEFT, left_labels[i], SCR_LABEL);
         el_paint(&els[EL_L0 + i]);
     }
     for (int i = 0; i < 4; i++) {
-        int16_t y = (int16_t)(SCR_ROW_Y0 + i * SCR_ROW_H + SCR_LABEL_DY);
-        gfx_draw_text(&font_small, (int16_t)(GFX_W - SCR_COL_W + 4), y, GFX_ALIGN_LEFT,
-                      right_labels[i], SCR_LABEL);
+        if (i < 3) {
+            int16_t y = (int16_t)(SCR_ROW_Y0 + i * SCR_ROW_H + SCR_LABEL_DY);
+            gfx_draw_text(&font_small, (int16_t)(GFX_W - SCR_EDGE), y, GFX_ALIGN_RIGHT,
+                          right_labels[i], SCR_LABEL);
+        }
         el_paint(&els[EL_R0 + i]);
     }
+    el_paint(&els[EL_R3_LABEL]);
 
     el_paint(&els[EL_CLOCK]);
     el_paint(&els[EL_DURATION]);

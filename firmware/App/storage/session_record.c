@@ -3,13 +3,14 @@
 //
 // - the text is pretty-printed with full words on purpose: the card gets
 //   pulled out and read on a laptop, and that matters more than the bytes. a
-//   block is 2 KB of which the object uses about 1.7 KB, so there is room for
-//   a few more fields before the layout has to move
+//   block is 2 KB of which the object uses about 1.9 KB, 2,025 bytes at the
+//   worst-case widths - full, a new field needs room made first
 // - null is used for anything not known: no fix means no start time, no
 //   BME680 means no weather; a reader then sees a missing value instead of a
 //   zero that looks real
-// - iaq, eco2 and bvoc are written as null on purpose - BSEC is a later step
-//   and the keys are reserved so the file format does not change then
+// - iaq, eco2 and breath voc are drive averages of the calibrated samples
+//   only, and null if BSEC never got there; each is capped to a width no
+//   wider than null plus two, which is what the worst-case test measures
 // - the faults section is the console's evidence, kept with the drive it
 //   belongs to; counters only, no message text - if something needs digging
 //   into, the ST-Link is the tool for that
@@ -188,6 +189,10 @@ void session_record_build(session_record_t *r, uint32_t session_n,
     r->hum_min_pct = trip->hum_min_pct;
     r->hum_max_pct = trip->hum_max_pct;
     r->hum_avg_pct = trip->hum_avg_pct;
+    r->air_valid = (trip->air_n > 0u);
+    r->iaq_avg = trip->iaq_avg;
+    r->eco2_avg_ppm = trip->eco2_avg_ppm;
+    r->bvoc_avg_ppm = trip->bvoc_avg_ppm;
     if (elev != NULL) {
         // climb comes from the barometer alone now, so it is known from the
         // first pressure sample, fix or no fix
@@ -198,6 +203,11 @@ void session_record_build(session_record_t *r, uint32_t session_n,
 }
 
 // ---- text ----------------------------------------------------------------------
+
+// keep a number inside a range, so its printed width is known
+static float clampf(float v, float lo, float hi) {
+    return (v < lo) ? lo : ((v > hi) ? hi : v);
+}
 
 // append to the block, tracking how much room is left; n is the running length
 static void put(char *buf, size_t *n, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
@@ -336,9 +346,19 @@ bool session_record_format(const session_record_t *r, char *buf) {
     put(buf, &n, "      },\n");
 
     put(buf, &n, "      \"air_quality\": {\n");
-    put(buf, &n, "        \"iaq_index\": null,\n");
-    put(buf, &n, "        \"eco2_ppm\": null,\n");
-    put(buf, &n, "        \"breath_voc_ppm\": null\n");
+    if (r->air_valid) {
+        // capped so the widths stay known: IAQ tops out at 500 anyway, the
+        // other two are far past anything a car sees
+        put(buf, &n, "        \"iaq_index\": %.0f,\n", (double)clampf(r->iaq_avg, 0.0f, 500.0f));
+        put(buf, &n, "        \"eco2_ppm\": %.0f,\n",
+            (double)clampf(r->eco2_avg_ppm, 0.0f, 99999.0f));
+        put(buf, &n, "        \"breath_voc_ppm\": %.2f\n",
+            (double)clampf(r->bvoc_avg_ppm, 0.0f, 999.99f));
+    } else {
+        put(buf, &n, "        \"iaq_index\": null,\n");
+        put(buf, &n, "        \"eco2_ppm\": null,\n");
+        put(buf, &n, "        \"breath_voc_ppm\": null\n");
+    }
     put(buf, &n, "      },\n");
 
     put(buf, &n, "      \"faults\": ");

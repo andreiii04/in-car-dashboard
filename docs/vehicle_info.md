@@ -11,6 +11,9 @@ different ways:
   calibration    resting gravity and the gyro zero offset, measured on the board
   car specs      wheelbase, track, cog height - handbook or tape measure
 
+plus one number about how the board is installed rather than the car: how much
+warmer the BME680 runs than the air around it.
+
 
 ## the axis map
 
@@ -206,6 +209,26 @@ error worst case.
 
 since 13 oct the flat set is back in, the board is on the table for a while.
 the car set waits in the comment now - paste it back before the next drive.
+
+
+## the temperature offset
+
+VEHICLE_TEMP_OFFSET_C, 4.0 now. the BME680 sits in its own warm pocket - its
+gas heater, the MCU, the LDO and the panel all warm it - so it reads high, and
+the humidity reads low because it is measured against that warmer air.
+
+measured once, 13 oct, balcony, board in the open tray:
+
+  board      18.0 C   53.6 %RH   dew point ~8.5 C
+  outside    14 C     70 %RH     dew point ~8 C   (weather service)
+
+the dew points agree, so the water in the air is right and only the
+temperature is off - by 4. BSEC takes it off and works the humidity out again,
+so both come out right on the panel and in the record.
+
+it depends on the install, not the car: a closed case traps more heat, so
+recheck it once the lid is on. same way - a reference temperature at the same
+time and place, compare the dew points, take the difference.
 
 
 ## the car specs

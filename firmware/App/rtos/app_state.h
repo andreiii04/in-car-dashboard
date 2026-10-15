@@ -8,6 +8,9 @@
 // - the imu task is the only owner of attitude, trip and elevation, so GPS
 //   fixes and BME680 samples reach it through two queues and not a call
 // - the I2C mutex lives here too: the IMU and the BME680 sit on one bus
+// - BSEC's learned state goes from the env task to the log task through its
+//   own small buffer, not the snapshot - 180 bytes copied out 20 times a
+//   second by the panel would be for nothing
 // - the mutexes and queues are used straight through CMSIS-RTOS2 calls, no
 //   wrappers; only the snapshot has functions, because of the copy
 //
@@ -21,6 +24,7 @@
 #include "app_tasks.h"
 #include "imu.h"
 #include "env.h"
+#include "air.h"
 #include "gps.h"
 #include "lcd.h"
 #include "attitude.h"
@@ -28,6 +32,7 @@
 #include "elevation.h"
 #include "sd_spi.h"
 #include "session_log.h"
+#include "air_store.h"
 
 #define APP_FIX_QUEUE_LEN  8u   // ~1.6 s of fixes at 5 Hz before one is dropped
 #define APP_ENV_QUEUE_LEN  2u   // one every 3 s, so 2 is plenty
@@ -37,6 +42,11 @@ typedef struct {
     imu_status_t imu_s;
     imu_status_t int1_s;     // imu_int1_enable, only meaningful when imu_s is OK
     env_status_t env_s;
+    air_status_t air_s;      // BSEC, or AIR_NO_LIB in a build without it
+    air_restore_t air_restore;   // what happened to the state off the card
+    air_store_boot_t air_store;  // what the card had
+    bool         air_ver_ok;
+    uint8_t      air_ver[4]; // BSEC version
     gps_status_t gps_s;
     lcd_status_t lcd_s;
     lcd_probe_t  lcd_probe;
@@ -71,9 +81,15 @@ typedef struct {
 // env task, after every measurement
 typedef struct {
     bool         have;          // a sample has arrived since boot
-    env_sample_t sample;        // the newest one
+    env_sample_t sample;        // the newest one, raw
+    air_sample_t air;           // what BSEC made of it
+    env_settings_t set;         // what BSEC asked the sensor for last time
     uint32_t     errors;        // measurements that failed or never finished
     uint32_t     dropped;       // the env queue was full
+    int32_t      air_code;      // the last code BSEC gave that was not 0
+    uint32_t     air_late;      // calls outside BSEC's 6.25% timing window
+    uint32_t     air_bad;       // every other code that was not 0
+    uint32_t     air_state_tick;    // HAL tick the state last went to the log task; 0 = never
 } app_env_t;
 
 // disp task, every frame
@@ -88,6 +104,7 @@ typedef struct {
     log_status_t status;
     log_stats_t  stats;
     sd_stats_t   sd;
+    air_store_stats_t air_store;
 } app_log_t;
 
 // worst cases since the console last looked; every note keeps the larger
@@ -110,7 +127,8 @@ typedef struct {
 // one item on the env queue; the tick lets the imu task work out the time
 // between two samples
 typedef struct {
-    env_sample_t sample;
+    env_sample_t sample;    // raw - the pressure is taken from here
+    air_sample_t air;       // corrected temperature and humidity, and the air quality
     uint32_t     tick;
 } app_env_msg_t;
 
@@ -142,5 +160,10 @@ void app_state_take(app_state_t *out);
 
 // just the newest fix - for get_fattime, which FatFs calls from the log task
 void app_state_get_fix(gps_fix_t *out);
+
+// BSEC's state, env task -> log task; put replaces whatever was waiting, take
+// is true only once per put. buf holds AIR_STATE_MAX bytes
+void app_state_put_air_state(const uint8_t *buf, uint16_t len);
+bool app_state_take_air_state(uint8_t *buf, uint16_t *len);
 
 #endif // APP_STATE_H

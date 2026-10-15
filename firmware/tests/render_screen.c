@@ -87,8 +87,9 @@ int main(int argc, char **argv) {
     d.temp_c = 24.6f;
     d.hum_pct = 43.0f;
     d.press_hpa = 1006.0f;
-    d.gas_valid = true;
-    d.gas_kohm = 51.0f;
+    d.iaq_valid = true;
+    d.iaq = 48.0f;
+    d.iaq_accuracy = 3;
     d.duration_s = 3737u;
     d.sd_ok = true;
     d.fix_valid = true;

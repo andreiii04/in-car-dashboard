@@ -21,6 +21,11 @@ static osMutexId_t state_mutex;
 // file scope so the debugger can live-watch it
 static app_state_t state;
 
+// BSEC's state waiting for the log task; fresh until it is taken
+static uint8_t  air_state[AIR_STATE_MAX];
+static uint16_t air_state_len;
+static bool     air_state_fresh;
+
 static const osMutexAttr_t state_mutex_attr = {
     .name = "state",
     .attr_bits = osMutexPrioInherit,
@@ -123,4 +128,29 @@ void app_state_get_fix(gps_fix_t *out) {
     lock();
     *out = state.gps.fix;
     unlock();
+}
+
+void app_state_put_air_state(const uint8_t *buf, uint16_t len) {
+    if (len > AIR_STATE_MAX) {
+        return;
+    }
+    lock();
+    memcpy(air_state, buf, len);
+    air_state_len = len;
+    air_state_fresh = true;
+    unlock();
+}
+
+bool app_state_take_air_state(uint8_t *buf, uint16_t *len) {
+    bool fresh;
+
+    lock();
+    fresh = air_state_fresh;
+    if (fresh) {
+        memcpy(buf, air_state, air_state_len);
+        *len = air_state_len;
+        air_state_fresh = false;
+    }
+    unlock();
+    return fresh;
 }

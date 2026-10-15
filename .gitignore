@@ -5,6 +5,9 @@ CLAUDE.md
 # datasheets - kept on disk, the README lists the parts
 datasheets/
 
+# Bosch BSEC2 - closed source under Bosch's licence, the README says how to get it
+firmware/App/drivers/bsec/
+
 # docs - the case note, the car numbers, my notes, the pictures and the BOM are public
 docs/*
 !docs/dash_case.md

@@ -29,8 +29,9 @@
 #include "env.h"
 #include "lcd.h"
 
-// 4 sectors a block; the pretty-printed object needs about 1.7 KB and the rest
-// is padding, so a new field does not change the file layout
+// 4 sectors a block; the pretty-printed object needs about 1.9 KB, 2,025
+// bytes at the worst-case widths, and the rest is padding - the block is full,
+// a new field needs room made first
 #define SESSION_RECORD_LEN  2048u
 
 // the separator that ends every block - a comma, or the closing brackets
@@ -95,6 +96,9 @@ typedef struct {
 
     bool  elev_valid;
     float elev_gain_m, elev_loss_m;
+
+    bool  air_valid;           // BSEC reached accuracy 3 at least once this drive
+    float iaq_avg, eco2_avg_ppm, bvoc_avg_ppm;
 
     bool             faults_valid;
     session_faults_t faults;

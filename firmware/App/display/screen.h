@@ -42,8 +42,9 @@ typedef struct {
     float temp_c;
     float hum_pct;
     float press_hpa;
-    bool  gas_valid;
-    float gas_kohm;
+    bool    iaq_valid;      // BSEC has produced an IAQ
+    float   iaq;
+    uint8_t iaq_accuracy;   // BSEC's 0-3; grey at 0, coloured from 1, tagged until 3
 
     // top strip
     uint32_t duration_s;    // since power-up

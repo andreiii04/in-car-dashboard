@@ -5,25 +5,26 @@
 // - the BME680 only has sleep and forced mode; forced means one measurement on
 //   demand and the sensor puts itself back to sleep afterwards
 // - so a read is trigger -> wait -> read back, unlike the IMU which free-runs;
-//   the wait is the caller's, so the loop keeps running through it
-// - 2x temperature, 16x pressure, 1x humidity, IIR coefficient 3, gas heater
-//   at 300 C for 100 ms; the reasoning behind those is in docs/notes.md
+//   the wait is the caller's, so the task sleeps through it
+// - IIR coefficient 3 is set once here; oversampling and the gas heater come
+//   in with every env_start, from BSEC. they are only written to the sensor
+//   when they change - in LP mode they never do, so a measurement costs the
+//   same few I2C transfers as before. the reasoning is in docs/notes.md
 //
 
 #include "env.h"
 #include "bme68x.h"
 #include <stddef.h>
 
-#define ENV_HEATR_TEMP_C 300
-#define ENV_HEATR_DUR_MS 100
-
 // defined in bme68x_platform.c - holds the callbacks and the address
 extern struct bme68x_dev bme68x_ctx;
 
-// both kept at file scope because env_start needs them again to work out how
+// what the sensor holds right now; env_start needs it again to work out how
 // long one measurement takes
 static struct bme68x_conf env_conf;
 static struct bme68x_heatr_conf env_heatr_conf;
+static env_settings_t env_applied;
+static bool env_have_applied;
 
 env_status_t env_init(void) {
     int8_t rslt;
@@ -38,11 +39,6 @@ env_status_t env_init(void) {
         return ENV_ERR_BUS;
     }
 
-    // oversampling = how many readings the sensor averages internally per sample
-    env_conf.os_temp = BME68X_OS_2X;    // accuracy is capped by calibration, not by noise
-    env_conf.os_pres = BME68X_OS_16X;   // pressure is the noisy one and the extra time is free here
-    env_conf.os_hum = BME68X_OS_1X;     // capped by the sensing material, avg cannot help
-
     // IIR filter, applies to temperature and pressure only; kills door slams
     // and vent blasts without hiding real changes
     env_conf.filter = BME68X_FILTER_SIZE_3;
@@ -50,30 +46,62 @@ env_status_t env_init(void) {
     // standby time between measurements, only used in sequential mode
     env_conf.odr = BME68X_ODR_NONE;
 
+    // placeholders until the first env_start brings the real ones
+    env_conf.os_temp = BME68X_OS_2X;
+    env_conf.os_pres = BME68X_OS_16X;
+    env_conf.os_hum = BME68X_OS_1X;
+
     rslt = bme68x_set_conf(&env_conf, &bme68x_ctx);
     if (rslt != BME68X_OK) {
         return ENV_ERR_BUS;
     }
-
-    // gas heater on; the hot plate heats the sensing layer,
-    // whose resistance changes with the gases around it
-    env_heatr_conf.enable = BME68X_ENABLE;
-    env_heatr_conf.heatr_temp = ENV_HEATR_TEMP_C;
-    env_heatr_conf.heatr_dur = ENV_HEATR_DUR_MS;
-
-    rslt = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &env_heatr_conf, &bme68x_ctx);
-    if (rslt != BME68X_OK) {
-        return ENV_ERR_BUS;
-    }
-
+    env_have_applied = false;
     return ENV_OK;
 }
 
-env_status_t env_start(uint32_t *wait_ms) {
-    uint32_t meas_dur_us;
+// write oversampling and heater only if they differ from what the sensor has
+static env_status_t env_apply(const env_settings_t *s) {
+    if (env_have_applied &&
+        (s->os_temp == env_applied.os_temp) && (s->os_pres == env_applied.os_pres) &&
+        (s->os_hum == env_applied.os_hum) && (s->gas_on == env_applied.gas_on) &&
+        (s->heater_temp_c == env_applied.heater_temp_c) &&
+        (s->heater_ms == env_applied.heater_ms)) {
+        return ENV_OK;
+    }
 
-    if (wait_ms == NULL) {
+    env_conf.os_temp = s->os_temp;
+    env_conf.os_pres = s->os_pres;
+    env_conf.os_hum = s->os_hum;
+    if (bme68x_set_conf(&env_conf, &bme68x_ctx) != BME68X_OK) {
+        return ENV_ERR_BUS;
+    }
+
+    // the hot plate heats the sensing layer, whose resistance changes with
+    // the gases around it
+    env_heatr_conf.enable = s->gas_on ? BME68X_ENABLE : BME68X_DISABLE;
+    env_heatr_conf.heatr_temp = s->heater_temp_c;
+    env_heatr_conf.heatr_dur = s->heater_ms;
+    if (bme68x_set_heatr_conf(BME68X_FORCED_MODE, &env_heatr_conf, &bme68x_ctx) != BME68X_OK) {
+        return ENV_ERR_BUS;
+    }
+
+    env_applied = *s;
+    env_have_applied = true;
+    return ENV_OK;
+}
+
+env_status_t env_start(const env_settings_t *s, uint32_t *wait_ms) {
+    uint32_t meas_dur_us;
+    env_status_t st;
+
+    if ((s == NULL) || (wait_ms == NULL)) {
         return ENV_ERR_ARG;
+    }
+
+    st = env_apply(s);
+    if (st != ENV_OK) {
+        env_have_applied = false;   // half written - write it all next time
+        return st;
     }
 
     // kick off one measurement; the sensor drops back to sleep on its own.
@@ -87,7 +115,10 @@ env_status_t env_start(uint32_t *wait_ms) {
     // bme68x_get_meas_dur only covers the temp/pressure/humidity part, so the
     // heating time goes on top; us -> ms, rounded up, plus one for luck
     meas_dur_us = bme68x_get_meas_dur(BME68X_FORCED_MODE, &env_conf, &bme68x_ctx);
-    *wait_ms = ((meas_dur_us + 999u) / 1000u) + (uint32_t)ENV_HEATR_DUR_MS + 1u;
+    *wait_ms = ((meas_dur_us + 999u) / 1000u) + 1u;
+    if (s->gas_on) {
+        *wait_ms += s->heater_ms;
+    }
     return ENV_OK;
 }
 

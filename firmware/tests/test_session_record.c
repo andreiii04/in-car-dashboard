@@ -225,7 +225,21 @@ int main(void) {
     e.counting = true;
     session_record_build(&r, 12, &t, &e, &f);
     (void)session_record_format(&r, block);
-    check("iaq reserved as null", strstr(block, "\"iaq_index\": null") != NULL);
+    check("never calibrated means null iaq", strstr(block, "\"iaq_index\": null") != NULL);
+    check("never calibrated means null breath voc",
+          strstr(block, "\"breath_voc_ppm\": null") != NULL);
+    t.air_n = 40;
+    t.iaq_avg = 48.4f;
+    t.eco2_avg_ppm = 612.3f;
+    t.bvoc_avg_ppm = 0.623f;
+    session_record_build(&r, 12, &t, &e, &f);
+    (void)session_record_format(&r, block);
+    check("iaq written as a whole number", strstr(block, "\"iaq_index\": 48,") != NULL);
+    check("eco2 written as a whole number", strstr(block, "\"eco2_ppm\": 612,") != NULL);
+    check("breath voc to two places", strstr(block, "\"breath_voc_ppm\": 0.62\n") != NULL);
+    t.air_n = 0;
+    session_record_build(&r, 12, &t, &e, &f);
+    (void)session_record_format(&r, block);
     check("session number reads back", session_record_parse_n(block) == 12);
 
     // ---- the faults section ----------------------------------------------
@@ -326,6 +340,10 @@ int main(void) {
     t.press_min_hpa = 99999.9f;
     e.gain_m = 999999.0f;
     e.loss_m = 999999.0f;
+    t.air_n = 1;                  // past every cap, so the caps set the width
+    t.iaq_avg = 9999.0f;
+    t.eco2_avg_ppm = 1.0e9f;
+    t.bvoc_avg_ppm = 1.0e6f;
     f.imu_init = IMU_ERR_TIMEOUT;
     f.env_init = ENV_ERR_NO_DATA;
     f.gps_init = GPS_ERR_UART;
@@ -348,6 +366,9 @@ int main(void) {
     fits = session_record_format(&r, block);
     printf("  worst case used %zu bytes\n", object_bytes(block));
     check("worst-case widths still fit", fits);
+    check("iaq capped at 500", strstr(block, "\"iaq_index\": 500,") != NULL);
+    check("eco2 capped at 99999", strstr(block, "\"eco2_ppm\": 99999,") != NULL);
+    check("breath voc capped at 999.99", strstr(block, "\"breath_voc_ppm\": 999.99\n") != NULL);
     check("worst-case block is still the right length", strlen(block) == SESSION_RECORD_LEN);
     check("worst-case block still closes the document",
           strstr(block, "\n  ]\n}\n") == &block[SESSION_RECORD_LEN - 7]);
