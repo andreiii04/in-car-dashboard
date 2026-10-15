@@ -66,11 +66,18 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     App/storage/session_log.c
     App/console/console.c
     App/sensors/bench_cal.c
+    App/rtos/app_state.c
+    App/rtos/app_tasks.c
+    App/rtos/watchdog.c
     App/fonts/font_small.c
     App/fonts/font_medium.c
     App/fonts/font_large.c
     App/drivers/lsm6dso/lsm6dso_reg.c
     App/drivers/bme68x/bme68x.c
+    # newlib's malloc and stdio locks for FreeRTOS; CubeMX generates this into
+    # the firmware root (with stm32_lock.h next to it) but leaves it out of its
+    # own cmake file, and without it the locks are newlib's empty stubs
+    newlib_lock_glue.c
 )
 
 # Add include paths
@@ -82,6 +89,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     App/display
     App/storage
     App/console
+    App/rtos
     App/drivers/lsm6dso
     App/drivers/bme68x
 )

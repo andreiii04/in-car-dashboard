@@ -5,7 +5,8 @@
 //   Mac sees a virtual COM port, so no debugger and no extra wiring
 // - printf lands in a line buffer here and only reaches USB on a newline, so
 //   one transfer carries a whole line instead of one per character
-// - main-loop use only; printing from an interrupt would corrupt the buffer
+// - task use only, one task at a time (boot, then con); printing from an
+//   interrupt would corrupt the buffer
 //
 
 #ifndef USB_SERIAL_H

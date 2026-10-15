@@ -15,8 +15,11 @@
 
 // defined in lsm6dso_platform.c - holds the read/write callbacks and the address
 extern stmdev_ctx_t lsm6dso_ctx;
-// only the EXTI handler writes this; main compares it against its own copy
+// only the EXTI handler writes this; the imu task compares it against its own copy
 static volatile uint32_t int1_edges;
+
+// called from the EXTI handler after the count; set once at boot
+static void (*edge_cb)(void);
 
 #define IMU_WHO_AM_I_EXPECTED 0x6CU  // fixed value, datasheet ch9.11
 #define IMU_RESET_TIMEOUT_MS  100U
@@ -167,11 +170,19 @@ uint32_t imu_int1_count(void) {
     return int1_edges;
 }
 
+void imu_set_edge_callback(void (*cb)(void)) {
+    edge_cb = cb;
+}
+
 // HAL calls this out of EXTI15_10_IRQHandler once it has cleared the pending
-// bit; keep it to a few instructions - USART1 feeds the GPS ring one byte at a
-// time, and no printf is allowed in an ISR
+// bit; keep it to a few instructions - no printf in an ISR. EXTI15_10 sits at
+// priority 5, the highest one allowed to call the kernel, so the callback may
+// wake a task; USART1 stays at 0, above it
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     if (GPIO_Pin == ACC_INT_Pin) {
         int1_edges++;
+        if (edge_cb != NULL) {
+            edge_cb();
+        }
     }
 }

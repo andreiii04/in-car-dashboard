@@ -91,7 +91,7 @@ void gfx_invalidate_all(void);
 bool gfx_dirty(void);
 
 // paint and send one band of the oldest dirty rectangle; returns true if
-// there is more to do - call it once per loop pass, never in a loop of its own
+// there is more to do - only the disp task calls it, looping until a frame is done
 bool gfx_flush_band(void);
 
 // bands sent since init, for the console

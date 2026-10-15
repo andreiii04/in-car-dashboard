@@ -17,7 +17,7 @@
 #define BENCH_CAL 0
 #endif
 
-// call from the main loop; does nothing unless BENCH_CAL is 1 and 20 s have
+// call from the imu task; does nothing unless BENCH_CAL is 1 and 20 s have
 // passed since the last run. imu_ok gates it on the sensor having come up
 void bench_cal_tick(bool imu_ok);
 

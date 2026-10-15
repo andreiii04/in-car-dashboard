@@ -4,7 +4,7 @@
 // - wraps USART1, which is where the GPS talks; USART6 would need its own
 //   instance of this
 // - the GPS sends whenever it wants, so an interrupt drops each byte into a
-//   ring buffer and the main loop takes them out later
+//   ring buffer and the gps task takes them out later
 //
 
 #ifndef UART_BUS_H

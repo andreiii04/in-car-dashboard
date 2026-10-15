@@ -9,7 +9,7 @@ two words that come up a lot:
               0  usb console         5  loop paced by the IMU's data-ready line
               1  i2c sensors         6  display
               2  bench calibration   7  sd card
-              3  gps                 8  the main loop
+              3  gps                 8  the main loop, 8b moved onto freertos
               4  pitch and roll      9  BSEC, 10 tuning - not done yet
   session   one power-on, one record in SESSIONS.JSON on the card
               5      19 sep         first drive, 18 min
@@ -2240,7 +2240,7 @@ format has not been on the board yet.
 
 ## the loop
 
-still a plain superloop, no rtos. one pass:
+this was the superloop, before freertos replaced it in 8b. one pass:
 
   gps_poll        every pass, the ring holds ~2 s
   imu tick        on the INT1 edge, ~105 a second: read, map, attitude, trip
@@ -2419,6 +2419,147 @@ the board sitting on its solder tails. numbers and the car steps in
 vehicle_info.md.
 
 
+## moving onto freertos
+
+the card write was the last thing still eating IMU samples - up to 245 ms
+with the IMU waiting behind it. a loop can't fix that, everything waits its
+turn. an rtos can.
+
+an rtos is a small scheduler. each job is its own endless loop - a task - and
+the scheduler picks which one runs. the rule: the highest priority task that
+is ready runs right now, even if a lower one is halfway through something.
+that's preemption.
+
+so the IMU gets the top and the card the bottom. when INT1 fires, a card write
+just pauses for the ~1.75 ms the IMU needs, then carries on.
+
+
+## the tasks
+
+  boot   once         all the init, starts the others, deletes itself
+  wdg    every 250 ms the watchdog
+  imu    on INT1      filter, trip stats, altitude
+  gps    every 10 ms  drains the ring, parses
+  env    every 3 s    BME680
+  disp   every 50 ms  the panel
+  con    every 1 s    every printf
+  log    every 1 s    the card, writes every 10 s
+
+highest priority at the top. each task owns its hardware and nothing else
+touches it. the imu task is the only one touching attitude, trip and
+elevation, so nothing can change them halfway through an update.
+
+a waiting task uses no cpu. osDelay(10) means wake me in 10 ms, and something
+else runs meanwhile - the old loop waited by checking the clock over and
+over. HAL_Delay still spins though, and holds the cpu from everything below
+it. only boot and two rare spots still use it.
+
+
+## talking between tasks
+
+- queue - a mailbox. the gps task drops each new fix in, the imu task picks
+  them up when it wakes. same for BME680 samples. full queue = item dropped
+  and counted, qdrop on the console
+- mutex - a key only one task holds at a time. the IMU and the BME680 share
+  one i2c bus, so whoever talks takes the i2c key first. the IMU waits up to
+  ~2.4 ms for a BME680 read - the bus runs at 100 kHz, i guessed <1 ms
+- snapshot - one struct, a section per task. each task writes only its own
+  section; panel, console and card copy the whole thing under the lock and
+  let go. nobody ever reads half an update
+
+priority inheritance: a low task holding a key the IMU wants gets bumped up
+to IMU priority until it lets go. otherwise a middle task could stop it
+finishing and the IMU waits on nothing.
+
+
+## interrupts and the scheduler
+
+the INT1 interrupt still just counts the edge, then sets a flag that wakes
+the imu task. the counter says if there's a new sample, the flag only wakes.
+
+only interrupts at priority 5 or less urgent may talk to the scheduler (lower
+number = more urgent). INT1 moved to 5 for that. the gps uart and usb stay at
+0 and never call it - the gps task polls the ring every 10 ms instead of
+being woken per byte.
+
+no INT1 for 50 ms and the imu task reads once anyway - the line is latched,
+one missed read and it stays high for good. rec on the console counts those;
+1 at boot is normal, an edge comes in before the task exists.
+
+
+## stacks and the heap
+
+every task has its own stack, where its local variables live. too small and
+it writes into whatever sits next in memory. freertos checks and stops the
+board if that happens.
+
+the console prints how much of each stack was never touched, the high-water
+mark. first run env had 236 bytes left of 1024, so it went to 1.5 KB. the
+rest had 300+ spare.
+
+stacks and queues come out of a 40 KB rtos heap. lowest it got was 18 KB
+free, during boot - boot's 4 KB stack goes back when it deletes itself. room
+to shrink it later.
+
+
+## the watchdog
+
+the IWDG is a timer on its own clock that resets the chip unless it gets
+reloaded within ~2 s. once started nothing stops it.
+
+the wdg task reloads it every 250 ms, but only if every task checked in
+recently - imu and gps within 100 ms, disp 250 ms, the slow ones a few s. so
+a task stuck for ~2 s resets the board; one slow pass just skips a reload.
+
+frozen while the debugger has the core halted, or every breakpoint would
+reset. a watchdog reset looks like a power-on, new session record and all -
+the console says reset: WATCHDOG so i can tell.
+
+
+## printf and the scheduler
+
+newlib, the c library, isn't safe from two tasks at once on its own. st's
+generated glue pauses the scheduler while malloc or printf runs, so a console
+line can't be interrupted, not even by the IMU.
+
+in the car nobody's listening and a line is microseconds. on the bench usb
+can hold a line up to 10 ms. seen once: dtmax 22 ms in the first second after
+boot. if it gets worse - format the line first, send it outside the lock.
+
+
+## boot
+
+usb has to start inside a task now (cubemx puts it there) and everything after
+it wants the console. so the whole old init runs in one boot task, same order
+as before, then it starts the other seven and deletes itself. main.c only
+starts the scheduler.
+
+
+## freertos numbers
+
+15 oct, flashed by dfu, usb-c only, board on the table.
+
+  int1        105 edges, 105 reads a second
+  dtmax       10 ms, also through a 31 ms card write
+  gps         ovr 0, qdrop 0, 115200 5 Hz
+  errors      0 everywhere
+  imu         ~1.75 ms a sample, ~4.2 ms when it waits on the BME680
+
+the card no longer reaches the IMU, which was the whole point.
+
+first three edges/s read 115, 109, 90. that's 314 = 3 x 105 - the console's
+one second windows settling in, not lost samples. dtmax stayed 10.
+
+two odd things, both harmless:
+- power up with no card and thin white lines move over the black boot screen
+  for a second, then settle. never with a card. lcd and card are on separate
+  spi buses, no shared pins. the old build with no card would tell if it's
+  the module
+- plug usb-c back in too fast and boot takes 4-5 s. the mac hasn't dropped the
+  old device yet, the 3 s usb wait runs out and the init printout is lost.
+  wait a second between unplug and plug
+
+
 ## left for later
 
 INT1 is done - the loop is paced by the sensor now, 105 edges a second and no
@@ -2443,8 +2584,10 @@ zero missed. then steps 6 to 8, written blind against the datasheets and all
 three passed in one session - the panel, the card, and the whole loop running
 together for eight minutes with nothing missed.
 
+freertos is done (8b) - the card write no longer costs IMU samples.
+
 next: a new ml2032 (or D3 out and a CR2032), a drive with references (trip meter, speedo, a
-roundabout, a signed grade, known altitudes), then the rtos, BSEC, tuning, the
+roundabout, a signed grade, known altitudes), then BSEC, tuning, the
 top case. and the gps needs open sky: time to first fix, altitude, and whether
 the 3 s clock offset and the age walk survive a proper fix.
 

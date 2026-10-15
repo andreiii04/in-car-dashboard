@@ -74,13 +74,18 @@ Sources (FreeCAD 1.1): [`bottom_tray.FCStd`](hardware/case/bottom_tray.FCStd), [
 
 ## Firmware
 
-C, bare-metal superloop on STM32 HAL (CubeMX-generated init), built with CMake and arm-none-eabi-gcc. No RTOS yet.
+C on STM32 HAL (CubeMX-generated init) and FreeRTOS through CMSIS-RTOS2, built with CMake and arm-none-eabi-gcc.
 
-The loop is paced by the IMU's own data-ready interrupt at about 105 Hz. Each sample is mapped from sensor axes to vehicle axes (ISO 8855: X forward, Y left, Z up), run through the attitude filter, then handed to the trip statistics. Around that, on every pass:
-- the GPS ring buffer is drained and NMEA sentences parsed
-- the BME680 is triggered and read back in two halves every 3 s, so nothing blocks
-- the screen redraws at 20 Hz, one 16-line band per pass, with no framebuffer
-- the session record is rewritten every 10 s
+A boot task runs the whole init, then starts one task per job and ends. From highest priority to lowest:
+- **watchdog** — reloads the hardware watchdog every 250 ms, but only while every other task keeps checking in on time
+- **IMU** — woken by the IMU's own data-ready interrupt at about 105 Hz; each sample is mapped from sensor axes to vehicle axes (ISO 8855: X forward, Y left, Z up), run through the attitude filter, then handed to the trip statistics. It is the only task that touches the filter, the statistics and the altitude; GPS fixes and BME680 samples reach it through queues
+- **GPS** — drains the UART ring buffer every 10 ms and parses NMEA sentences
+- **environment** — triggers the BME680 every 3 s and sleeps while it measures
+- **display** — redraws at 20 Hz, band by band, with no framebuffer
+- **console** — the once-a-second status block over USB
+- **logger** — rewrites the session record on the SD card every 10 s
+
+Each task publishes what it knows into one shared snapshot behind a mutex, and the display, console and logger read copies of it. A card write can take up to 250 ms; with the logger at the bottom, it no longer delays a single IMU sample.
 
 | Stack | Modules |
 |---|---|
@@ -90,6 +95,7 @@ The loop is paced by the IMU's own data-ready interrupt at about 105 Hz. Each sa
 | Display | `lcd` (ILI9341 over SPI) → `gfx` (band renderer, dirty rectangles) → `screen` |
 | Storage | `sd_spi` (SD SPI mode, CRC on every command and block) → FatFs → `session_record` → `session_log` |
 | Console | `usb_serial` (printf over USB CDC) → `console` |
+| RTOS | `app_tasks` (boot sequence and task loops), `app_state` (shared snapshot, queues, I2C mutex), `watchdog` (per-task check-ins) |
 
 Everything with no hardware in it is host-testable and tested on a PC, 257 checks across seven modules: `nmea`, `attitude`, `trip`, `elevation`, `gfx`, `sd_crc`, `session_record`. Expected values come from independent derivations rather than restatements of the code under test. Car- and mount-specific constants (axis map, calibration, wheelbase, track, centre-of-gravity height) live in one header, `firmware/App/fusion/vehicle_axes.h`, explained in [`docs/vehicle_info.md`](docs/vehicle_info.md).
 
@@ -112,6 +118,7 @@ firmware/            STM32 firmware (CMake, CubeMX project dashboard_firmware.io
     display/         ILI9341 driver, band renderer, screen layout
     storage/         SD card over SPI, session record and log
     console/         USB serial console
+    rtos/            FreeRTOS tasks, shared state, watchdog
     drivers/         vendor sensor drivers (ST, Bosch), unmodified
     fonts/           generated bitmap fonts
   Core/ Drivers/ FATFS/ Middlewares/ USB_DEVICE/   CubeMX- and ST-generated
@@ -170,10 +177,9 @@ Not included in the repository; all are available from the manufacturers:
 
 ## Status
 
-Working on the bench and in the car. Bring-up is complete: console, sensors, calibration, GPS, attitude, interrupt-paced sampling, display, SD logging and the main loop. The first long drive, 118.5 km, matched the route distance and ran with every fault counter at zero.
+Working on the bench and in the car. Bring-up is complete: console, sensors, calibration, GPS, attitude, interrupt-paced sampling, display, SD logging, the main loop, and its move onto FreeRTOS. The first long drive, 118.5 km, matched the route distance and ran with every fault counter at zero.
 
 Still to do:
-- Moving the main loop onto FreeRTOS
 - Air-quality index through Bosch's BSEC library, which is closed source and won't be in this repository
 - Tuning the filters against logged drives
 - Printing and fitting the lid

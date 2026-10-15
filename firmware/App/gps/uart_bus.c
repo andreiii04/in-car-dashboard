@@ -3,7 +3,7 @@
 //
 // - HAL_UART_Receive_IT asks for one byte; when it lands the interrupt fires,
 //   store it and immediately ask for the next one
-// - head is only written by the interrupt, tail only by the main loop, so the
+// - head is only written by the interrupt, tail only by the gps task, so the
 //   two never fight over the same variable and no locking is needed
 //
 
@@ -28,7 +28,7 @@ extern UART_HandleTypeDef huart1;
 static uint8_t rx_byte;                        // HAL drops each new byte here
 static volatile uint8_t ring[UART_BUS_RING_SIZE];
 static volatile uint16_t head;                 // written by the interrupt only
-static volatile uint16_t tail;                 // written by the main loop only
+static volatile uint16_t tail;                 // written by the gps task only
 static volatile uint32_t overruns;
 static volatile uint32_t rx_count;
 
@@ -108,7 +108,7 @@ uart_bus_status_t uart_bus_set_baud(uint32_t baud) {
         return UART_BUS_ERR_HAL;
     }
 
-    // the interrupt is stopped, so the main loop can reset both ends safely
+    // the interrupt is stopped, so the gps task can reset both ends safely
     head = 0;
     tail = 0;
 

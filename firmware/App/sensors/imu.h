@@ -54,4 +54,10 @@ imu_status_t imu_int1_enable(void);
 // it cannot race, and a jump bigger than 1 means samples were missed
 uint32_t imu_int1_count(void);
 
+// a function the INT1 interrupt calls after counting the edge - the RTOS
+// layer uses it to wake the task that reads the IMU. runs inside the
+// interrupt, so it must be short and use only "from ISR" kernel calls.
+// NULL, the default, means count only
+void imu_set_edge_callback(void (*cb)(void));
+
 #endif // IMU_H

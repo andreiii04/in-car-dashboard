@@ -24,8 +24,9 @@ FATFS USERFatFS;    /* File system object for USER logical drive */
 FIL USERFile;       /* File object for USER */
 
 /* USER CODE BEGIN Variables */
-// the file timestamps come off the GPS clock, the only wall clock on board
-#include "gps.h"
+// the file timestamps come off the GPS clock, the only wall clock on board,
+// read through the shared snapshot
+#include "app_state.h"
 #include "session_record.h"
 /* USER CODE END Variables */
 
@@ -48,7 +49,9 @@ DWORD get_fattime(void)
 {
   /* USER CODE BEGIN get_fattime */
   gps_fix_t fix;
-  gps_get_fix(&fix);
+  // FatFs calls this from the log task, and the GPS belongs to the gps task -
+  // so the clock comes out of the shared snapshot, not from gps_get_fix
+  app_state_get_fix(&fix);
   return (DWORD)session_record_fattime(&fix);
   /* USER CODE END get_fattime */
 }
