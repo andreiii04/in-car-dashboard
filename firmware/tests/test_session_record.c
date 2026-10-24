@@ -375,13 +375,13 @@ int main(void) {
 
     // ---- local time, worked out by hand ----------------------------------
     printf("  local offset under test: %+d min\n", VEHICLE_UTC_OFFSET_MIN);
-    check("the offset is the one the notes describe", VEHICLE_UTC_OFFSET_MIN == 180);
-    check_local("midday needs no carry", 26, 9, 16, 10, 34, 2026, 9, 16, 13, 34);
-    check_local("late evening carries the day", 26, 9, 16, 22, 45, 2026, 9, 17, 1, 45);
-    check_local("the last day of a month carries the month", 26, 9, 30, 23, 30, 2026, 10, 1, 2, 30);
-    check_local("new year's eve carries the year", 26, 12, 31, 22, 45, 2027, 1, 1, 1, 45);
-    check_local("28 February in a common year", 27, 2, 28, 23, 10, 2027, 3, 1, 2, 10);
-    check_local("28 February in a leap year", 28, 2, 28, 23, 10, 2028, 2, 29, 2, 10);
+    check("the offset is the one the notes describe", VEHICLE_UTC_OFFSET_MIN == 120);
+    check_local("midday needs no carry", 26, 9, 16, 10, 34, 2026, 9, 16, 12, 34);
+    check_local("late evening carries the day", 26, 9, 16, 22, 45, 2026, 9, 17, 0, 45);
+    check_local("the last day of a month carries the month", 26, 9, 30, 23, 30, 2026, 10, 1, 1, 30);
+    check_local("new year's eve carries the year", 26, 12, 31, 22, 45, 2027, 1, 1, 0, 45);
+    check_local("28 February in a common year", 27, 2, 28, 23, 10, 2027, 3, 1, 1, 10);
+    check_local("28 February in a leap year", 28, 2, 28, 23, 10, 2028, 2, 29, 1, 10);
     check_local("a date the module never filled in is left alone", 26, 0, 0, 5, 0, 2026, 0, 0, 5, 0);
 
     sample_trip(&t);
@@ -390,7 +390,7 @@ int main(void) {
     session_record_build(&r, 5, &t, &e, &f);
     session_record_format(&r, block);
     check("start_local is written with its offset",
-          strstr(block, "\"start_local\": \"2026-09-16T01:45:17+03:00\"") != NULL);
+          strstr(block, "\"start_local\": \"2026-09-16T00:45:17+02:00\"") != NULL);
 
     // ---- FAT time ---------------------------------------------------------
     // 2026-09-15 20:42:17 -> year 46 since 1980, seconds stored /2

@@ -2224,11 +2224,11 @@ the GPS gives UTC and the firmware keeps UTC everywhere, on purpose - one
 clock, no conversions hiding in the middle. UTC only becomes local where a
 human reads it: the clock on the panel, and start_local in the record.
 
-one constant, VEHICLE_UTC_OFFSET_MIN, currently 180 for summer. i edit it
-twice a year. no DST rule in firmware - that is a calendar to maintain for a
+one constant, VEHICLE_UTC_OFFSET_MIN, 120 for winter now, 180 in summer. i edit it
+twice a year, and the record test with it. no DST rule in firmware - that is a calendar to maintain for a
 number i can change in one line.
 
-adding three hours can cross midnight, a month end and a new year, so the
+adding two or three hours can cross midnight, a month end and a new year, so the
 record's conversion carries the date properly, leap years included. the panel
 only shows hours and minutes so it just wraps at 1440.
 
@@ -2724,11 +2724,12 @@ together for eight minutes with nothing missed.
 freertos is done (8b) - the card write no longer costs IMU samples. BSEC is
 done (9) - IAQ on the panel, averages in the record, its state on the card.
 
-next: VEHICLE_UTC_OFFSET_MIN to 120 for winter, a short drive on the car set,
+next: a short drive on the car set,
 a per-second drive log so a drive can be replayed on the mac for tuning, a
 new ml2032 (or D3 out and a CR2032), a drive with references (trip meter,
 speedo, a roundabout, a signed grade, known altitudes), the top case. and the gps needs open sky: time to first fix, altitude, and whether
-the 3 s clock offset and the age walk survive a proper fix.
+the age walk survives a proper fix. the 3 s clock offset is gone - on 4 oct
+the panel clock matched the phone to the second.
 
 the lateral fix is flashed - every sample now, not once a second. the car rest
 reading, 43 deg nose up on the dash, is taken both ways round on a slope

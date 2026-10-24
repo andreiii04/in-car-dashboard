@@ -18,6 +18,7 @@ docs/*
 !docs/3Dbottom.jpeg
 !docs/pcb.jpeg
 !docs/case_pcb_side.jpeg
+!docs/case_assembly.jpeg
 !docs/stm32_main_page.jpeg
 !docs/sensors.jpeg
 !docs/display.jpeg

@@ -12,6 +12,10 @@
 # - glyphs are 1-bit, rows packed MSB first, every glyph the same height (the
 #   cell) with a shared baseline, so text lines up whatever it says
 # - `--dump` prints a few glyphs as ASCII art to eyeball the placement
+# - font names on the command line make only those, e.g.
+#     python3 tools/gen_fonts.py font_gauge
+#   a newer FreeType draws a few pixels differently, so leave the checked-in
+#   fonts alone unless they are meant to change
 #
 
 import os
@@ -32,6 +36,7 @@ FONTS = [
     ('font_small', 11, ASCII),
     ('font_medium', 17, ASCII),
     ('font_large', 32, '-./0123456789'),   # contiguous codes 45..57
+    ('font_gauge', 27, '-./0123456789'),   # the live g number, ~15% under large
 ]
 
 FLAGS = LoadFlags.RENDER | LoadFlags.TARGET_MONO
@@ -136,10 +141,15 @@ def dump(name, height, ascent, table, chars):
 
 def main():
     want_dump = '--dump' in sys.argv
+    names = [a for a in sys.argv[1:] if not a.startswith('--')]
+    for a in names:
+        assert a in [f[0] for f in FONTS], 'no font called %s' % a
     for name, em_px, chars in FONTS:
+        if names and name not in names:
+            continue
         height, ascent, table, bits = build(name, em_px, chars)
         if want_dump:
-            dump(name, height, ascent, table, 'Agj.' if name != 'font_large' else '8.')
+            dump(name, height, ascent, table, 'Agj.' if ord(chars[0]) == 32 else '8.')
         else:
             path, size = write_c(name, em_px, height, ascent, table, bits)
             print('%s: cell %d px, %d glyphs, %d bytes -> %s'

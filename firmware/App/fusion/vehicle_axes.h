@@ -56,9 +56,9 @@ static inline void vehicle_map(const float sensor[3], float out[3]) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. calibration - the rest reading is the car set, taken with the board on
-//    the dash; the flat set from the bench tray is kept below to paste back.
-//    the gyro bias is the bench one and stays
+// 2. calibration - the rest reading is the flat set, taken in the tray on the
+//    table; the car set from the dash is kept below to paste back before a
+//    drive. the gyro bias is the bench one and stays
 // ---------------------------------------------------------------------------
 //
 // the accelerometer reading at rest, already run through vehicle_map above.
@@ -181,6 +181,6 @@ static inline float vehicle_max_yaw_rate_dps(float speed_kmh) {
 // Romania is UTC+2 in winter and UTC+3 in summer, so this gets edited twice a
 // year. no DST rule in firmware on purpose - it would be a calendar to
 // maintain for a number i can change in one line
-#define VEHICLE_UTC_OFFSET_MIN 180   // +3 h, summer time
+#define VEHICLE_UTC_OFFSET_MIN 120   // +2 h, winter time
 
 #endif // VEHICLE_AXES_H

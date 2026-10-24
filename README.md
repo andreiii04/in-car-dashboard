@@ -56,6 +56,8 @@ A two-part 3D-printed enclosure. The bottom tray holds the board on four bosses,
 
 Sources (FreeCAD 1.1): [`bottom_tray.FCStd`](hardware/case/bottom_tray.FCStd), [`top_case.FCStd`](hardware/case/top_case.FCStd), [`spacer_tube.FCStd`](hardware/case/spacer_tube.FCStd), with a STEP export of each next to it for other CAD tools. Dimensions, load path and print settings are in [`docs/dash_case.md`](docs/dash_case.md).
 
+![The case as modelled: lid on the tray, without the board or display](docs/case_assembly.jpeg)
+
 ![Board in the bottom tray](docs/case_pcb_side.jpeg)
 
 ### Schematic and layout
@@ -70,7 +72,7 @@ Sources (FreeCAD 1.1): [`bottom_tray.FCStd`](hardware/case/bottom_tray.FCStd), [
 
 ### Known issues on this revision
 
-- **No copper keepout under the GPS antenna.** The antenna's datasheet asks for a copper-free corner on all layers; it was missed. With solid copper underneath, the module heard nothing, so the chip antenna is lifted about 1 cm above its pads on two wire stubs; it fixes with 9–16 satellites that way. A rev B would add the keepout or a U.FL connector for a patch antenna.
+- **No copper keepout under the GPS antenna** *(fixed in the files)*. The antenna's datasheet asks for a copper-free corner on all layers; on the boards as made it was missed. With solid copper underneath, the module heard nothing, so on the assembled board the chip antenna is lifted about 1 cm above its pads on two wire stubs; it fixes with 9–16 satellites that way. The KiCad files here already carry the keepout, a 13.2 × 20 mm copper-free area on all four layers under the antenna, so the layout picture above shows the corrected board.
 - **The display module never drives its SDO line,** so register reads return `0xFF`. The firmware treats the ID check as advisory; writes work normally.
 - **The IMU sits on the underside of the board,** so the firmware's axis map flips two axes. This is by design, but it surprises anyone reading raw values.
 
@@ -146,7 +148,18 @@ cmake --build build/Debug
 
 The output is `build/Debug/dashboard_firmware.elf`.
 
-**Air quality needs Bosch's BSEC2 library, which is not in this repository** (it is closed source under Bosch's licence). Without it the firmware still builds and runs: the BME680 gives raw temperature, humidity, pressure and gas resistance, and the IAQ field stays empty. To add it, download **BSEC2 2.6.1.0** from Bosch Sensortec's BSEC page (a licence click-through), unzip it and copy the whole package to `firmware/App/drivers/bsec/`, so that `firmware/App/drivers/bsec/algo/bsec_IAQ/bin/gcc/Cortex_M4F/libalgobsec.a` exists. CMake finds it on the next configure (`BSEC found - air quality on`) and links the Cortex-M4F hard-float build with the `bme680_iaq_33v_3s_4d` config. The folder is in `.gitignore`. Flash it over SWD with an ST-Link: from an IDE (CLion with the STM32 plugin, or STM32CubeIDE), or with STM32CubeProgrammer. The serial console is the USB-C port itself, at `/dev/cu.usbmodem*` on macOS; the baud rate is ignored.
+**Air quality needs Bosch's BSEC2 library, which is not in this repository** (it is closed source under Bosch's licence). Without it the firmware still builds and runs: the BME680 gives raw temperature, humidity, pressure and gas resistance, and the IAQ field stays empty. To add it, download **BSEC2 2.6.1.0** from Bosch Sensortec's BSEC page (a licence click-through), unzip it and copy the whole package to `firmware/App/drivers/bsec/`, so that `firmware/App/drivers/bsec/algo/bsec_IAQ/bin/gcc/Cortex_M4F/libalgobsec.a` exists. CMake finds it on the next configure (`BSEC found - air quality on`) and links the Cortex-M4F hard-float build with the `bme680_iaq_33v_3s_4d` config. The folder is in `.gitignore`.
+
+Flash it over SWD with an ST-Link: from an IDE (CLion with the STM32 plugin, or STM32CubeIDE), or with STM32CubeProgrammer. Without a probe, the chip's own USB bootloader works over the same USB-C cable: hold BOOT0 high while plugging in, then
+
+```sh
+cd firmware
+arm-none-eabi-objcopy -O binary build/Debug/dashboard_firmware.elf firmware.bin
+dfu-util -l
+dfu-util -a 0 -s 0x08000000:leave -D firmware.bin
+```
+
+`dfu-util -l` should list `@Internal Flash`. The serial console is the USB-C port itself, at `/dev/cu.usbmodem*` on macOS; the baud rate is ignored.
 
 Host tests build with any C11 compiler. For example:
 

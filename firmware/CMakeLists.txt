@@ -75,6 +75,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     App/fonts/font_small.c
     App/fonts/font_medium.c
     App/fonts/font_large.c
+    App/fonts/font_gauge.c
     App/drivers/lsm6dso/lsm6dso_reg.c
     App/drivers/bme68x/bme68x.c
     # newlib's malloc and stdio locks for FreeRTOS; CubeMX generates this into

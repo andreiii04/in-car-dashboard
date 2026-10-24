@@ -13,7 +13,8 @@
 // how to run
 //  cc -std=c11 -Wall -Wextra -I App/display -I App/fusion tests/render_screen.c
 //  App/display/gfx.c App/display/screen.c App/fonts/font_small.c
-//  App/fonts/font_medium.c App/fonts/font_large.c -lm -o /tmp/render_screen
+//  App/fonts/font_medium.c App/fonts/font_large.c App/fonts/font_gauge.c
+//  -lm -o /tmp/render_screen
 //  && /tmp/render_screen /tmp
 
 #include <stdio.h>

@@ -19,7 +19,8 @@
 // ---- geometry ----------------------------------------------------------------
 
 #define SCR_CX          160
-#define SCR_CY          120
+#define SCR_CY          116    // the ring fills the gap between the two divider
+                               // lines exactly, y 32 to 200
 #define SCR_R_RING      84     // outer edge of the grey ring
 #define SCR_R_DISC      60     // the black disc the dot lives on
 #define SCR_R_NUMBERS   72     // the four peak numbers sit on this radius
@@ -35,7 +36,7 @@
                                // start at 68 and one row is level with them
 #define SCR_SPEED_X     74     // the speed ends further right: "100" is 3 x 22 px
                                // in the large font, so it starts at x 8; the ring
-                               // comes no closer than x 86 in that row
+                               // comes no closer than x 84 in that row
 #define SCR_ROW_Y0      36     // right column, four rows
 #define SCR_ROW_H       43
 #define SCR_LROW_Y0     40     // left column, three rows, so they get more room
@@ -43,6 +44,9 @@
 #define SCR_LABEL_DY    0      // label at the top of the row
 #define SCR_VALUE_DY    13     // value sits below the label
 #define SCR_LVALUE_DY   15     // the speed value is the large font, so it sits lower
+#define SCR_MAG_X       118    // the live g number, centred here - up and left,
+#define SCR_MAG_Y       63     // half on the ring between two peak numbers; past
+                               // ~1.2 g up-left the dot covers its first digit
 
 // ---- colours -----------------------------------------------------------------
 
@@ -173,11 +177,9 @@ static void screen_layout(void) {
     el_setup(EL_RING_RIGHT, &font_medium, (int16_t)(SCR_CX + SCR_R_NUMBERS), (int16_t)(SCR_CY - half),
              GFX_ALIGN_CENTER, 40, SCR_VALUE);
 
-    // the live magnitude, left of centre; its bottom sits level with the top
-    // of the side peak numbers, which keeps it clear of the dot at rest
-    el_setup(EL_CENTRE, &font_large, (int16_t)(SCR_CX - 30),
-             (int16_t)(SCR_CY - half - font_large.height),
-             GFX_ALIGN_CENTER, 72, SCR_NUMBER);
+    // the live magnitude, up and left on the ring, clear of the dot and of the
+    // left and top peak numbers
+    el_setup(EL_CENTRE, &font_gauge, SCR_MAG_X, SCR_MAG_Y, GFX_ALIGN_CENTER, 60, SCR_NUMBER);
 
     // left column: speed is the headline number, so it gets the large font
     el_setup(EL_L0, &font_large, SCR_SPEED_X,
@@ -334,8 +336,13 @@ void screen_update(const screen_data_t *d) {
     screen_update_dot(d);
 
     // left column
-    snprintf(buf, sizeof(buf), "%.0f", (double)d->speed_kmh);
-    el_set(EL_L0, d->coasting ? SCR_LABEL : SCR_VALUE, buf);
+    // no fix and nothing to coast on means no speed at all, not a 0
+    if (!d->fix_valid && !d->coasting) {
+        el_set(EL_L0, SCR_DIM, "--");
+    } else {
+        snprintf(buf, sizeof(buf), "%.0f", (double)d->speed_kmh);
+        el_set(EL_L0, d->coasting ? SCR_LABEL : SCR_VALUE, buf);
+    }
     snprintf(buf, sizeof(buf), "%.0f", (double)d->speed_max_kmh);
     el_set(EL_L1, SCR_VALUE, buf);
     if (d->distance_km < 100.0f) {
